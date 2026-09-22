@@ -1,0 +1,32 @@
+import { z } from "zod";
+
+const nullableAmount = z.number().finite().positive().nullable().optional();
+const nullableText = (maximum) => z.string().trim().max(maximum).nullable().optional();
+
+export const createPaymentMethodSchema = z.object({
+  asset: nullableText(20),
+  category: z.enum(["card", "wallet", "bank", "crypto"]),
+  code: z.string().trim().toLowerCase().min(2).max(40).regex(/^[a-z0-9-]+$/),
+  displayOrder: z.number().int().min(0).optional(),
+  instructions: z.string().trim().max(1000).optional(),
+  maximumAmount: nullableAmount,
+  minimumAmount: nullableAmount,
+  name: z.string().trim().min(2).max(80),
+  network: nullableText(40),
+  status: z.enum(["active", "coming_soon", "disabled"]).optional(),
+  walletAddress: nullableText(200),
+});
+
+export const updatePaymentMethodSchema = createPaymentMethodSchema
+  .omit({ code: true })
+  .partial()
+  .refine((payload) => Object.keys(payload).length > 0, {
+    message: "Submit at least one field to update.",
+  });
+
+export const deletePaymentMethodsSchema = z.object({
+  ids: z
+    .array(z.string().regex(/^[a-f\d]{24}$/i, "Each payment method ID must be valid."))
+    .min(1, "Select at least one payment method.")
+    .max(100, "A maximum of 100 payment methods can be deleted at once."),
+});
