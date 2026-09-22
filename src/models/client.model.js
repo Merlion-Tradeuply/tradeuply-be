@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const investmentRanges = ["$100–$999", "$1,000–$4,999", "$5,000–$24,999", "$25,000+"];
+const investmentRanges = ["$50–$249", "$250–$449", "$500–$999", "$1000+"];
 const investmentExperiences = ["New investor", "Some experience", "Experienced"];
 const investmentObjectives = [
   "Short-term opportunity",
