@@ -2,9 +2,11 @@ import { PaymentMethod } from "../models/payment-method.model.js";
 import { AppError } from "../utils/app-error.js";
 import {
   buildUploadFolder,
+  createSignedImageUpload,
   deleteUploadedFile,
   getUploadResourceType,
   uploadFile,
+  verifySignedImageUpload,
 } from "./upload.service.js";
 
 const defaultPaymentMethods = [
@@ -175,7 +177,7 @@ export async function getActivePaymentMethod(methodId) {
   return method;
 }
 
-export async function uploadPaymentMethodQrCode(methodId, file) {
+async function getCryptocurrencyPaymentMethod(methodId) {
   const method = await PaymentMethod.findOne({ _id: methodId, deletedAt: null });
 
   if (!method) {
@@ -185,12 +187,45 @@ export async function uploadPaymentMethodQrCode(methodId, file) {
     });
   }
 
-  if (method.code !== "usdt") {
-    throw new AppError("QR image upload is currently available only for USDT.", {
-      code: "QR_UPLOAD_NOT_SUPPORTED",
-      statusCode: 400,
-    });
+  if (method.category !== "crypto") {
+    throw new AppError(
+      "QR image upload is available only for cryptocurrency payment methods.",
+      {
+        code: "QR_UPLOAD_NOT_SUPPORTED",
+        statusCode: 400,
+      },
+    );
   }
+
+  return method;
+}
+
+export async function createPaymentMethodQrUploadSignature(methodId) {
+  const method = await getCryptocurrencyPaymentMethod(methodId);
+
+  return createSignedImageUpload({
+    folder: buildUploadFolder("payment-methods", method.code, "qr-code"),
+    publicId: "receiving-wallet-qr",
+  });
+}
+
+export async function completePaymentMethodQrUpload(methodId, uploadResponse) {
+  const method = await getCryptocurrencyPaymentMethod(methodId);
+  const folder = buildUploadFolder("payment-methods", method.code, "qr-code");
+  const asset = verifySignedImageUpload({
+    ...uploadResponse,
+    expectedPublicId: `${folder}/receiving-wallet-qr`,
+  });
+
+  method.qrCodePublicId = asset.publicId;
+  method.qrCodeUrl = asset.secureUrl;
+  await method.save();
+
+  return { asset, method: serializeMethod(method, true) };
+}
+
+export async function uploadPaymentMethodQrCode(methodId, file) {
+  const method = await getCryptocurrencyPaymentMethod(methodId);
 
   if (!file) {
     throw new AppError("Select a QR code image to upload.", {

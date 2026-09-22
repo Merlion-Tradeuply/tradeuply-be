@@ -30,3 +30,15 @@ export const deletePaymentMethodsSchema = z.object({
     .min(1, "Select at least one payment method.")
     .max(100, "A maximum of 100 payment methods can be deleted at once."),
 });
+
+export const completePaymentMethodQrUploadSchema = z
+  .object({
+    bytes: z.number().int().positive().max(4 * 1024 * 1024),
+    format: z.enum(["jpg", "jpeg", "png", "webp"]),
+    height: z.number().int().positive(),
+    publicId: z.string().trim().min(1).max(300),
+    signature: z.string().trim().min(1).max(200),
+    version: z.number().int().positive(),
+    width: z.number().int().positive(),
+  })
+  .strict();

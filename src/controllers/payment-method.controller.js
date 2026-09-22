@@ -1,4 +1,6 @@
 import {
+  completePaymentMethodQrUpload,
+  createPaymentMethodQrUploadSignature,
   createPaymentMethod,
   deletePaymentMethods,
   getAdminPaymentMethods,
@@ -48,7 +50,24 @@ export async function uploadPaymentMethodQr(request, response) {
   const result = await uploadPaymentMethodQrCode(request.params.methodId, request.file);
   response.status(200).json({
     data: result,
-    message: "The USDT QR code was uploaded successfully.",
+    message: "The payment method QR code was uploaded successfully.",
+    success: true,
+  });
+}
+
+export async function getPaymentMethodQrUploadSignature(request, response) {
+  const upload = await createPaymentMethodQrUploadSignature(request.params.methodId);
+  response.status(200).json({ data: { upload }, success: true });
+}
+
+export async function completePaymentMethodQr(request, response) {
+  const result = await completePaymentMethodQrUpload(
+    request.params.methodId,
+    request.validatedBody,
+  );
+  response.status(200).json({
+    data: result,
+    message: "The payment method QR code was uploaded successfully.",
     success: true,
   });
 }

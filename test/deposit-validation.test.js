@@ -6,6 +6,7 @@ import {
   reviewDepositSchema,
 } from "../src/validators/deposit.validator.js";
 import {
+  completePaymentMethodQrUploadSchema,
   deletePaymentMethodsSchema,
   updatePaymentMethodSchema,
 } from "../src/validators/payment-method.validator.js";
@@ -46,5 +47,29 @@ describe("deposit validation", () => {
 
     assert.equal(validResult.success, true);
     assert.equal(invalidResult.success, false);
+  });
+
+  it("validates a completed direct Cloudinary QR upload", () => {
+    const validResult = completePaymentMethodQrUploadSchema.safeParse({
+      bytes: 128_000,
+      format: "png",
+      height: 512,
+      publicId: "tradeuply/payment-methods/bitcoin/qr-code/receiving-wallet-qr",
+      signature: "cloudinary-response-signature",
+      version: 1_800_000_000,
+      width: 512,
+    });
+    const oversizedResult = completePaymentMethodQrUploadSchema.safeParse({
+      bytes: 5 * 1024 * 1024,
+      format: "png",
+      height: 512,
+      publicId: "tradeuply/payment-methods/bitcoin/qr-code/receiving-wallet-qr",
+      signature: "cloudinary-response-signature",
+      version: 1_800_000_000,
+      width: 512,
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(oversizedResult.success, false);
   });
 });

@@ -2,7 +2,9 @@ import { Router } from "express";
 
 import {
   addPaymentMethod,
+  completePaymentMethodQr,
   editPaymentMethod,
+  getPaymentMethodQrUploadSignature,
   getPaymentMethods,
   removePaymentMethods,
   uploadPaymentMethodQr,
@@ -13,6 +15,7 @@ import { uploadSingleFile } from "../middleware/upload.js";
 import { validateRequest } from "../middleware/validate-request.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
+  completePaymentMethodQrUploadSchema,
   createPaymentMethodSchema,
   deletePaymentMethodsSchema,
   updatePaymentMethodSchema,
@@ -49,4 +52,15 @@ paymentMethodRouter.post(
   authorizeRoles("super-admin"),
   uploadSingleFile("file"),
   asyncHandler(uploadPaymentMethodQr),
+);
+paymentMethodRouter.post(
+  "/:methodId/qr-code/signature",
+  authorizeRoles("super-admin"),
+  asyncHandler(getPaymentMethodQrUploadSignature),
+);
+paymentMethodRouter.post(
+  "/:methodId/qr-code/complete",
+  authorizeRoles("super-admin"),
+  validateRequest(completePaymentMethodQrUploadSchema),
+  asyncHandler(completePaymentMethodQr),
 );

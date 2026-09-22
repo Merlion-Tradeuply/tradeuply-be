@@ -42,6 +42,65 @@ function assertCloudinaryConfigured() {
   }
 }
 
+export function createSignedImageUpload({ folder, publicId }) {
+  assertCloudinaryConfigured();
+
+  const timestamp = Math.round(Date.now() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    { folder, public_id: publicId, timestamp },
+    env.cloudinaryApiSecret,
+  );
+
+  return {
+    apiKey: env.cloudinaryApiKey,
+    cloudName: env.cloudinaryCloudName,
+    folder,
+    publicId,
+    signature,
+    timestamp,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${env.cloudinaryCloudName}/image/upload`,
+  };
+}
+
+export function verifySignedImageUpload({
+  bytes,
+  expectedPublicId,
+  format,
+  height,
+  publicId,
+  signature,
+  version,
+  width,
+}) {
+  assertCloudinaryConfigured();
+
+  const isVerified =
+    publicId === expectedPublicId &&
+    cloudinary.utils.verify_api_response_signature(publicId, version, signature);
+
+  if (!isVerified) {
+    throw new AppError("The Cloudinary upload response could not be verified.", {
+      code: "UPLOAD_SIGNATURE_INVALID",
+      statusCode: 400,
+    });
+  }
+
+  return {
+    bytes,
+    format,
+    height,
+    mimeType: format === "jpg" ? "image/jpeg" : `image/${format}`,
+    publicId,
+    resourceType: "image",
+    secureUrl: cloudinary.url(publicId, {
+      format,
+      secure: true,
+      version,
+    }),
+    width,
+  };
+}
+
 export function uploadFile({ buffer, folder, mimeType, publicId }) {
   assertCloudinaryConfigured();
 
