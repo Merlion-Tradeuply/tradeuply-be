@@ -12,12 +12,13 @@ import {
 import { authorizeRoles } from "../middleware/authorize-roles.js";
 import { authenticateUser } from "../middleware/user-authentication.js";
 import { uploadSingleFile } from "../middleware/upload.js";
-import { validateRequest } from "../middleware/validate-request.js";
+import { validateQuery, validateRequest } from "../middleware/validate-request.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   completePaymentMethodQrUploadSchema,
   createPaymentMethodSchema,
   deletePaymentMethodsSchema,
+  paymentMethodQuerySchema,
   updatePaymentMethodSchema,
 } from "../validators/payment-method.validator.js";
 
@@ -27,6 +28,7 @@ paymentMethodRouter.use(asyncHandler(authenticateUser));
 paymentMethodRouter.get(
   "/",
   authorizeRoles("super-admin", "admin"),
+  validateQuery(paymentMethodQuerySchema),
   asyncHandler(getPaymentMethods),
 );
 paymentMethodRouter.post(

@@ -72,10 +72,46 @@ export async function getClientPaymentMethods() {
   return methods.map((method) => serializeMethod(method));
 }
 
-export async function getAdminPaymentMethods() {
+function escapeRegularExpression(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export async function getAdminPaymentMethods({ category, q, sort, status } = {}) {
   await ensureDefaultPaymentMethods();
-  const methods = await PaymentMethod.find({ deletedAt: null }).sort({ displayOrder: 1 });
-  return methods.map((method) => serializeMethod(method, true));
+  const filter = { deletedAt: null };
+
+  if (category) filter.category = category;
+  if (status) filter.status = status;
+  if (q) {
+    const searchExpression = new RegExp(escapeRegularExpression(q), "i");
+    filter.$or = ["name", "code", "asset", "network"].map((field) => ({
+      [field]: searchExpression,
+    }));
+  }
+
+  const sortOptions = {
+    "display-order": { displayOrder: 1, name: 1 },
+    "name-asc": { name: 1 },
+    "name-desc": { name: -1 },
+  };
+  const [methods, statusCounts] = await Promise.all([
+    PaymentMethod.find(filter).sort(sortOptions[sort] ?? sortOptions["display-order"]),
+    PaymentMethod.aggregate([
+      { $match: { deletedAt: null } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+  ]);
+  const summary = { active: 0, all: 0, coming_soon: 0, disabled: 0 };
+
+  for (const item of statusCounts) {
+    if (item._id in summary) summary[item._id] = item.count;
+    summary.all += item.count;
+  }
+
+  return {
+    methods: methods.map((method) => serializeMethod(method, true)),
+    summary,
+  };
 }
 
 export async function createPaymentMethod(payload) {

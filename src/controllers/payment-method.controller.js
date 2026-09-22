@@ -14,9 +14,9 @@ export async function clientPaymentMethods(_request, response) {
   response.status(200).json({ data: { methods }, success: true });
 }
 
-export async function getPaymentMethods(_request, response) {
-  const methods = await getAdminPaymentMethods();
-  response.status(200).json({ data: { methods }, success: true });
+export async function getPaymentMethods(request, response) {
+  const result = await getAdminPaymentMethods(request.validatedQuery);
+  response.status(200).json({ data: result, success: true });
 }
 
 export async function addPaymentMethod(request, response) {

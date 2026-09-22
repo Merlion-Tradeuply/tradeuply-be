@@ -8,6 +8,7 @@ import {
 import {
   completePaymentMethodQrUploadSchema,
   deletePaymentMethodsSchema,
+  paymentMethodQuerySchema,
   updatePaymentMethodSchema,
 } from "../src/validators/payment-method.validator.js";
 
@@ -71,5 +72,21 @@ describe("deposit validation", () => {
 
     assert.equal(validResult.success, true);
     assert.equal(oversizedResult.success, false);
+  });
+
+  it("validates payment-method API filters", () => {
+    const validResult = paymentMethodQuerySchema.safeParse({
+      category: "crypto",
+      q: "bitcoin",
+      sort: "name-asc",
+      status: "active",
+    });
+    const invalidResult = paymentMethodQuerySchema.safeParse({
+      category: "unsupported",
+      sort: "newest",
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(invalidResult.success, false);
   });
 });

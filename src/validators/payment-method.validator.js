@@ -3,6 +3,15 @@ import { z } from "zod";
 const nullableAmount = z.number().finite().positive().nullable().optional();
 const nullableText = (maximum) => z.string().trim().max(maximum).nullable().optional();
 
+export const paymentMethodQuerySchema = z
+  .object({
+    category: z.enum(["bank", "card", "crypto", "wallet"]).optional(),
+    q: z.string().trim().max(100).optional(),
+    sort: z.enum(["display-order", "name-asc", "name-desc"]).default("display-order"),
+    status: z.enum(["active", "coming_soon", "disabled"]).optional(),
+  })
+  .strict();
+
 export const createPaymentMethodSchema = z.object({
   asset: nullableText(20),
   category: z.enum(["card", "wallet", "bank", "crypto"]),

@@ -58,3 +58,26 @@ export function validateJsonField(fieldName, schema) {
     return next();
   };
 }
+
+export function validateQuery(schema) {
+  return function queryValidator(request, response, next) {
+    const result = schema.safeParse(request.query);
+
+    if (!result.success) {
+      return response.status(422).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          details: result.error.issues.map((issue) => ({
+            field: issue.path.join("."),
+            message: issue.message,
+          })),
+          message: "Please correct the submitted filters.",
+        },
+        success: false,
+      });
+    }
+
+    request.validatedQuery = result.data;
+    return next();
+  };
+}
