@@ -11,6 +11,10 @@ import {
   paymentMethodQuerySchema,
   updatePaymentMethodSchema,
 } from "../src/validators/payment-method.validator.js";
+import {
+  deleteTransactionsSchema,
+  transactionQuerySchema,
+} from "../src/validators/transaction.validator.js";
 
 describe("deposit validation", () => {
   it("accepts a complete USDT deposit submission", () => {
@@ -88,5 +92,21 @@ describe("deposit validation", () => {
 
     assert.equal(validResult.success, true);
     assert.equal(invalidResult.success, false);
+  });
+
+  it("validates transaction filters and bulk deletion", () => {
+    const filters = transactionQuerySchema.safeParse({
+      direction: "credit",
+      q: "client@example.com",
+      type: "deposit",
+    });
+    const deletion = deleteTransactionsSchema.safeParse({
+      ids: ["507f1f77bcf86cd799439011"],
+    });
+    const invalidDeletion = deleteTransactionsSchema.safeParse({ ids: [] });
+
+    assert.equal(filters.success, true);
+    assert.equal(deletion.success, true);
+    assert.equal(invalidDeletion.success, false);
   });
 });

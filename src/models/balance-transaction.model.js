@@ -24,6 +24,7 @@ const balanceTransactionSchema = new mongoose.Schema(
       unique: true,
     },
     description: { maxlength: 250, required: true, trim: true, type: String },
+    deletedAt: { default: null, index: true, type: Date },
     direction: { enum: ["credit", "debit"], required: true, type: String },
     type: { enum: ["deposit", "withdrawal", "adjustment"], required: true, type: String },
   },

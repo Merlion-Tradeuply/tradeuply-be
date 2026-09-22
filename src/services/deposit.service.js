@@ -266,7 +266,10 @@ export async function reviewDeposit(depositId, payload, user, request) {
 }
 
 export async function getClientLedger(clientId) {
-  const transactions = await BalanceTransaction.find({ client: clientId }).sort({ createdAt: -1 });
+  const transactions = await BalanceTransaction.find({
+    client: clientId,
+    deletedAt: null,
+  }).sort({ createdAt: -1 });
   return transactions.map((transaction) => ({
     amount: transaction.amount.toString(),
     balanceAfter: transaction.balanceAfter.toString(),
