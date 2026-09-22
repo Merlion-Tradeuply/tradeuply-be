@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "lint": "eslint .",
+    "seed:investment-plans": "node src/seeders/investment-plan.seeder.js",
     "seed:super-admin": "node src/seeders/super-admin.seeder.js",
     "test": "node --test"
   },

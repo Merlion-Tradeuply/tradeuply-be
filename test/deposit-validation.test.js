@@ -6,6 +6,11 @@ import {
   reviewDepositSchema,
 } from "../src/validators/deposit.validator.js";
 import {
+  createInvestmentPlanSchema,
+  deleteInvestmentPlansSchema,
+  investmentPlanQuerySchema,
+} from "../src/validators/investment-plan.validator.js";
+import {
   completePaymentMethodQrUploadSchema,
   deletePaymentMethodsSchema,
   paymentMethodQuerySchema,
@@ -108,5 +113,36 @@ describe("deposit validation", () => {
     assert.equal(filters.success, true);
     assert.equal(deletion.success, true);
     assert.equal(invalidDeletion.success, false);
+  });
+
+  it("validates investment-plan CRUD and filters", () => {
+    const plan = createInvestmentPlanSchema.safeParse({
+      allocation: "Global equities · Bonds",
+      dailyObjective: 7,
+      description: "A diversified plan for balanced market exposure.",
+      displayOrder: 10,
+      features: ["Diversified assets"],
+      horizonDays: 7,
+      icon: "chart",
+      isFeatured: true,
+      minimumInvestment: 250,
+      name: "Balanced",
+      risk: "Moderate",
+      slug: "balanced",
+      status: "active",
+    });
+    const filters = investmentPlanQuerySchema.safeParse({
+      featured: "true",
+      q: "balanced",
+      sort: "minimum-asc",
+      status: "active",
+    });
+    const deletion = deleteInvestmentPlansSchema.safeParse({
+      ids: ["507f1f77bcf86cd799439011"],
+    });
+
+    assert.equal(plan.success, true);
+    assert.equal(filters.success, true);
+    assert.equal(deletion.success, true);
   });
 });
