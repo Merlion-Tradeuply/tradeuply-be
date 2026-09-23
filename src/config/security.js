@@ -6,6 +6,7 @@ export const securityConfig = Object.freeze({
     refreshTokenTtlSeconds: 7 * 24 * 60 * 60,
   },
   passwordHashRounds: 12,
+  passwordResetTokenTtlMs: 10 * 60 * 1000,
   otp: {
     length: 6,
     maxAttempts: 5,

@@ -3,7 +3,10 @@ import {
   getCurrentClient,
   loginClient,
   logoutClient,
+  requestClientPasswordReset,
+  resetClientPassword,
   refreshClientTokens,
+  verifyClientPasswordResetOtp,
 } from "../services/client.service.js";
 
 function getUserAgent(request) {
@@ -56,4 +59,33 @@ export async function currentClient(request, response) {
   const client = await getCurrentClient(request.clientAuth.sub);
 
   response.status(200).json({ data: { client }, success: true });
+}
+
+export async function clientForgotPassword(request, response) {
+  const otp = await requestClientPasswordReset(request.validatedBody);
+  response.status(202).json({
+    data: { otp },
+    message: "A password reset code has been sent to your registered email address.",
+    success: true,
+  });
+}
+
+export async function clientPasswordResetOtpVerification(request, response) {
+  const result = await verifyClientPasswordResetOtp(request.validatedBody);
+  response.status(200).json({
+    data: {
+      expiresAt: result.expiresAt.toISOString(),
+      resetToken: result.resetToken,
+    },
+    message: "The verification code was accepted.",
+    success: true,
+  });
+}
+
+export async function clientPasswordReset(request, response) {
+  await resetClientPassword(request.validatedBody);
+  response.status(200).json({
+    message: "Your password was reset successfully. You can now log in.",
+    success: true,
+  });
 }

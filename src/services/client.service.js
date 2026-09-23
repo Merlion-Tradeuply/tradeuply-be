@@ -1,10 +1,17 @@
+import { randomBytes } from "node:crypto";
+
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 
 import { securityConfig } from "../config/security.js";
 import { Client } from "../models/client.model.js";
+import { PasswordResetSession } from "../models/password-reset-session.model.js";
+import { RefreshSession } from "../models/refresh-session.model.js";
 import { AppError } from "../utils/app-error.js";
 import { maskEmail } from "../utils/normalizers.js";
-import { getActiveOtpState, issueOtp } from "./otp.service.js";
+import { hashToken } from "../utils/token-hash.js";
+import { getActiveOtpState, issueOtp, verifyOtp } from "./otp.service.js";
+import { sendPasswordResetEmails } from "./email.service.js";
 import {
   consumeRefreshToken,
   issueTokenPair,
@@ -12,6 +19,7 @@ import {
 } from "./token.service.js";
 
 const emailVerificationPurpose = "email_verification";
+const passwordResetPurpose = "password_reset";
 
 function getClientResponse(client) {
   return {
@@ -253,5 +261,116 @@ export async function resendClientVerificationOtp({ email, purpose }) {
     email: client.email,
     firstName: client.firstName,
     purpose,
+  });
+}
+
+export async function requestClientPasswordReset({ email }) {
+  const client = await Client.findOne({
+    deletedAt: null,
+    email,
+    status: "active",
+  });
+
+  if (!client) {
+    throw new AppError("No active client account was found for this email address.", {
+      code: "CLIENT_EMAIL_NOT_REGISTERED",
+      statusCode: 404,
+    });
+  }
+
+  return issueOtp({
+    email: client.email,
+    firstName: client.firstName,
+    purpose: passwordResetPurpose,
+  });
+}
+
+export async function verifyClientPasswordResetOtp({ email, otp }) {
+  const verification = await verifyOtp({
+    email,
+    otp,
+    purpose: passwordResetPurpose,
+  });
+  const client = await Client.findOne({
+    deletedAt: null,
+    email: verification.email,
+    status: "active",
+  });
+  if (!client) {
+    throw new AppError("The password reset request is no longer available.", {
+      code: "PASSWORD_RESET_NOT_AVAILABLE",
+      statusCode: 404,
+    });
+  }
+
+  const resetToken = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + securityConfig.passwordResetTokenTtlMs);
+  await PasswordResetSession.deleteMany({ client: client._id, consumedAt: null });
+  await PasswordResetSession.create({
+    client: client._id,
+    expiresAt,
+    tokenHash: hashToken(resetToken),
+  });
+
+  return { expiresAt, resetToken };
+}
+
+export async function resetClientPassword({ email, password, resetToken }) {
+  const passwordHash = await bcrypt.hash(
+    password,
+    securityConfig.passwordHashRounds,
+  );
+  const now = new Date();
+  const session = await mongoose.startSession();
+  let client;
+
+  try {
+    await session.withTransaction(async () => {
+      client = await Client.findOne({
+        deletedAt: null,
+        email,
+        status: "active",
+      }).session(session);
+      if (!client) {
+        throw new AppError("The password reset request is invalid or expired.", {
+          code: "PASSWORD_RESET_INVALID",
+          statusCode: 400,
+        });
+      }
+
+      const resetSession = await PasswordResetSession.findOneAndUpdate(
+        {
+          client: client._id,
+          consumedAt: null,
+          expiresAt: { $gt: now },
+          tokenHash: hashToken(resetToken),
+        },
+        { $set: { consumedAt: now } },
+        { new: true, session },
+      );
+      if (!resetSession) {
+        throw new AppError("The password reset request is invalid or expired.", {
+          code: "PASSWORD_RESET_INVALID",
+          statusCode: 400,
+        });
+      }
+
+      client.passwordHash = passwordHash;
+      await client.save({ session });
+      await RefreshSession.updateMany(
+        { accountId: client._id, accountType: "client", revokedAt: null },
+        { $set: { revokedAt: now } },
+        { session },
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  await sendPasswordResetEmails({ client, resetAt: now }).catch((error) => {
+    console.error("Password reset notifications could not be sent.", {
+      clientId: client.id,
+      message: error.message,
+    });
   });
 }

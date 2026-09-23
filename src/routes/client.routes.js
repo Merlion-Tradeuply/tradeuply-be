@@ -1,8 +1,11 @@
 import { Router } from "express";
 
 import {
+  clientForgotPassword,
   clientLogin,
   clientLogout,
+  clientPasswordReset,
+  clientPasswordResetOtpVerification,
   clientRegistration,
   clientTokenRefresh,
   currentClient,
@@ -12,12 +15,18 @@ import {
   clientLoginRateLimiter,
   clientRefreshRateLimiter,
   clientRegistrationRateLimiter,
+  otpVerificationRateLimiter,
+  passwordResetCompletionRateLimiter,
+  passwordResetRequestRateLimiter,
 } from "../middleware/rate-limiters.js";
 import { validateQuery, validateRequest } from "../middleware/validate-request.js";
 import {
   clientLoginSchema,
   clientRefreshTokenSchema,
   clientRegistrationSchema,
+  requestClientPasswordResetSchema,
+  resetClientPasswordSchema,
+  verifyClientPasswordResetOtpSchema,
 } from "../validators/client.validator.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import { otpRouter } from "./otp.routes.js";
@@ -68,6 +77,24 @@ clientRouter.post(
   clientLoginRateLimiter,
   validateRequest(clientLoginSchema),
   asyncHandler(clientLogin),
+);
+clientRouter.post(
+  "/password/forgot",
+  passwordResetRequestRateLimiter,
+  validateRequest(requestClientPasswordResetSchema),
+  asyncHandler(clientForgotPassword),
+);
+clientRouter.post(
+  "/password/verify-otp",
+  otpVerificationRateLimiter,
+  validateRequest(verifyClientPasswordResetOtpSchema),
+  asyncHandler(clientPasswordResetOtpVerification),
+);
+clientRouter.post(
+  "/password/reset",
+  passwordResetCompletionRateLimiter,
+  validateRequest(resetClientPasswordSchema),
+  asyncHandler(clientPasswordReset),
 );
 clientRouter.post(
   "/token/refresh",

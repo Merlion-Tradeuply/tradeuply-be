@@ -10,6 +10,12 @@ const investmentProfitSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
     },
     creditDate: { index: true, required: true, type: Date },
+    creditedBy: {
+      default: null,
+      ref: "User",
+      type: mongoose.Schema.Types.ObjectId,
+    },
+    creditedByLabel: { default: "", maxlength: 140, trim: true, type: String },
     dayNumber: { min: 1, required: true, type: Number },
     investment: {
       index: true,
@@ -17,6 +23,13 @@ const investmentProfitSchema = new mongoose.Schema(
       required: true,
       type: mongoose.Schema.Types.ObjectId,
     },
+    kind: {
+      default: "daily",
+      enum: ["daily", "bonus"],
+      index: true,
+      type: String,
+    },
+    note: { default: "", maxlength: 300, trim: true, type: String },
     status: {
       default: "available",
       enum: ["available", "withdrawn"],

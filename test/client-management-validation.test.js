@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  creditInvestmentBonusSchema,
   deleteManagedClientsSchema,
   managedClientQuerySchema,
   updateManagedClientSchema,
@@ -46,5 +47,15 @@ describe("client management validation", () => {
 
     assert.equal(result.success, true);
     assert.equal(deleteManagedClientsSchema.safeParse({ ids: [] }).success, false);
+  });
+
+  it("validates an investment bonus credit", () => {
+    const result = creditInvestmentBonusSchema.safeParse({
+      amountUsd: 25.5,
+      note: "Loyalty bonus",
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(creditInvestmentBonusSchema.safeParse({ amountUsd: 0 }).success, false);
   });
 });

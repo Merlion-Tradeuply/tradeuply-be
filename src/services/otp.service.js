@@ -74,6 +74,7 @@ export async function issueOtp({ email, firstName, purpose }) {
       email: normalizedEmail,
       firstName,
       otp,
+      purpose,
     });
 
     if (deliveryId) {

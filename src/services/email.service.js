@@ -5,6 +5,8 @@ import { createVerificationOtpEmail } from "../templates/verification-otp.email.
 import { createDepositSubmittedEmails } from "../templates/deposit-submitted.email.js";
 import { createDepositReviewedEmail } from "../templates/deposit-reviewed.email.js";
 import { createWithdrawalReviewedEmail, createWithdrawalSubmittedEmails } from "../templates/withdrawal.email.js";
+import { createInvestmentBonusEmail } from "../templates/investment-bonus.email.js";
+import { createPasswordResetEmails } from "../templates/password-reset.email.js";
 import { AppError } from "../utils/app-error.js";
 
 let resendClient;
@@ -28,9 +30,9 @@ function getResendClient() {
   return resendClient;
 }
 
-export async function sendVerificationOtpEmail({ email, firstName, otp }) {
+export async function sendVerificationOtpEmail({ email, firstName, otp, purpose }) {
   const client = getResendClient();
-  const content = createVerificationOtpEmail({ firstName, otp });
+  const content = createVerificationOtpEmail({ firstName, otp, purpose });
   const { data, error } = await client.emails.send({
     from: env.resendFromEmail,
     html: content.html,
@@ -90,6 +92,24 @@ export async function sendDepositReviewedEmail({ client, deposit }) {
   await sendMessages(
     [{ content: createDepositReviewedEmail({ client, deposit }), to: client.email }],
     "Deposit review notification",
+  );
+}
+
+export async function sendInvestmentBonusEmail({ bonus, client, investment }) {
+  await sendMessages(
+    [{ content: createInvestmentBonusEmail({ bonus, client, investment }), to: client.email }],
+    "Investment bonus notification",
+  );
+}
+
+export async function sendPasswordResetEmails({ client, resetAt }) {
+  const content = createPasswordResetEmails({ client, resetAt });
+  await sendMessages(
+    [
+      { content: content.client, to: client.email },
+      { content: content.admin, to: env.depositNotificationEmail },
+    ],
+    "Password reset notification",
   );
 }
 

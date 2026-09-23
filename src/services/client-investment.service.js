@@ -2,11 +2,13 @@ import mongoose from "mongoose";
 
 import { BalanceTransaction } from "../models/balance-transaction.model.js";
 import { Balance } from "../models/balance.model.js";
+import { Client } from "../models/client.model.js";
 import { ClientInvestment } from "../models/client-investment.model.js";
 import { InvestmentPlan } from "../models/investment-plan.model.js";
 import { InvestmentProfit } from "../models/investment-profit.model.js";
 import { AppError } from "../utils/app-error.js";
 import { convertCurrency } from "./currency.service.js";
+import { sendInvestmentBonusEmail } from "./email.service.js";
 
 const decimalPrecision = 8;
 const dayInMilliseconds = 24 * 60 * 60 * 1000;
@@ -107,6 +109,8 @@ function serializeProfit(profit) {
     creditDate: profit.creditDate,
     dayNumber: profit.dayNumber,
     id: profit.id,
+    kind: profit.kind ?? "daily",
+    note: profit.note ?? "",
     status: profit.status,
     walletAmount: profit.walletAmount.toString(),
     walletCurrency: profit.walletCurrency,
@@ -133,6 +137,7 @@ function serializeInvestment(investment, profits = [], includeHistory = false) {
   const horizonDays = investment.planSnapshot.horizonDays;
   const availableProfits = profits.filter((profit) => profit.status === "available");
   const withdrawnProfits = profits.filter((profit) => profit.status === "withdrawn");
+  const dailyProfits = profits.filter((profit) => (profit.kind ?? "daily") === "daily");
   const dailyProfit = getDailyProfit(investment);
   const elapsed = Math.max(0, now.getTime() - investment.startsAt.getTime());
   const duration = Math.max(
@@ -151,7 +156,7 @@ function serializeInvestment(investment, profits = [], includeHistory = false) {
     maturesAt: investment.maturesAt,
     plan: investment.planSnapshot,
     profit: {
-      accruedDays: profits.length,
+      accruedDays: dailyProfits.length,
       availableUsd: sumDecimals(
         availableProfits.map((profit) => profit.amountUsd.toString()),
       ),
@@ -184,6 +189,82 @@ function serializeInvestment(investment, profits = [], includeHistory = false) {
     status: investment.status,
     walletAmount: investment.walletAmount.toString(),
     walletCurrency: investment.walletCurrency,
+  };
+}
+
+export async function creditInvestmentBonus(
+  clientId,
+  investmentId,
+  payload,
+  user,
+) {
+  const investment = await findOwnedInvestment(clientId, investmentId);
+  if (investment.status === "cancelled") {
+    throw new AppError("A cancelled investment cannot receive a bonus.", {
+      code: "INVESTMENT_BONUS_NOT_AVAILABLE",
+      statusCode: 409,
+    });
+  }
+
+  await syncInvestmentLifecycle(investment);
+  const amountUsd = payload.amountUsd.toFixed(2);
+  const walletAmount = (
+    payload.amountUsd * Number(investment.exchangeRate.toString())
+  ).toFixed(decimalPrecision);
+  let bonus;
+
+  for (let attempt = 0; attempt < 3 && !bonus; attempt += 1) {
+    const latestProfit = await InvestmentProfit.findOne({
+      investment: investment._id,
+    })
+      .sort({ dayNumber: -1 })
+      .select("dayNumber")
+      .lean();
+    const dayNumber = Math.max(
+      investment.planSnapshot.horizonDays,
+      latestProfit?.dayNumber ?? 0,
+    ) + 1;
+
+    try {
+      bonus = await InvestmentProfit.create({
+        amountUsd: mongoose.Types.Decimal128.fromString(amountUsd),
+        client: investment.client,
+        creditDate: new Date(),
+        creditedBy: user._id,
+        creditedByLabel: `${user.firstName} ${user.lastName}`,
+        dayNumber,
+        investment: investment._id,
+        kind: "bonus",
+        note: payload.note,
+        status: "available",
+        walletAmount: mongoose.Types.Decimal128.fromString(walletAmount),
+        walletCurrency: investment.walletCurrency,
+      });
+    } catch (error) {
+      if (error?.code !== 11000 || attempt === 2) throw error;
+    }
+  }
+
+  const [client, profits] = await Promise.all([
+    Client.findById(clientId).lean(),
+    InvestmentProfit.find({ investment: investment._id }).sort({ dayNumber: 1 }),
+  ]);
+  if (client) {
+    await sendInvestmentBonusEmail({
+      bonus: serializeProfit(bonus),
+      client,
+      investment: serializeInvestment(investment, profits),
+    }).catch((error) => {
+      console.error("Investment bonus notification could not be sent.", {
+        investmentId: investment.id,
+        message: error.message,
+      });
+    });
+  }
+
+  return {
+    bonus: serializeProfit(bonus),
+    investment: serializeInvestment(investment, profits),
   };
 }
 

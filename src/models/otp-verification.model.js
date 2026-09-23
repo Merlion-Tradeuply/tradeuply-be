@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const otpPurposes = ["email_verification"];
+export const otpPurposes = ["email_verification", "password_reset"];
 
 const otpVerificationSchema = new mongoose.Schema(
   {

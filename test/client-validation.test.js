@@ -4,6 +4,9 @@ import { describe, it } from "node:test";
 import {
   clientLoginSchema,
   clientRegistrationSchema,
+  requestClientPasswordResetSchema,
+  resetClientPasswordSchema,
+  verifyClientPasswordResetOtpSchema,
 } from "../src/validators/client.validator.js";
 
 const validClientRegistration = {
@@ -69,5 +72,52 @@ describe("client login validation", () => {
     });
 
     assert.equal(result.success, false);
+  });
+});
+
+describe("client password reset validation", () => {
+  it("normalizes the email used to request a reset code", () => {
+    const result = requestClientPasswordResetSchema.parse({
+      email: "  CLIENT@Example.com ",
+    });
+
+    assert.equal(result.email, "client@example.com");
+  });
+
+  it("accepts only six-digit verification codes", () => {
+    const validResult = verifyClientPasswordResetOtpSchema.safeParse({
+      email: "client@example.com",
+      otp: "123456",
+    });
+    const invalidResult = verifyClientPasswordResetOtpSchema.safeParse({
+      email: "client@example.com",
+      otp: "12345A",
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(invalidResult.success, false);
+  });
+
+  it("enforces password strength and matching confirmation", () => {
+    const validResult = resetClientPasswordSchema.safeParse({
+      confirmPassword: "NewSecure1",
+      email: "client@example.com",
+      password: "NewSecure1",
+      resetToken: "a".repeat(43),
+    });
+    const mismatchResult = resetClientPasswordSchema.safeParse({
+      confirmPassword: "Different1",
+      email: "client@example.com",
+      password: "NewSecure1",
+      resetToken: "a".repeat(43),
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(mismatchResult.success, false);
+    assert.ok(
+      mismatchResult.error.issues.some((issue) =>
+        issue.path.includes("confirmPassword"),
+      ),
+    );
   });
 });

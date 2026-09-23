@@ -50,3 +50,10 @@ export const deleteManagedClientsSchema = z.object({
     .min(1, "Select at least one client.")
     .max(100, "A maximum of 100 clients can be deleted at once."),
 });
+
+export const creditInvestmentBonusSchema = z
+  .object({
+    amountUsd: z.number().finite().min(0.01).max(1_000_000),
+    note: z.string().trim().max(300).optional().default(""),
+  })
+  .strict();

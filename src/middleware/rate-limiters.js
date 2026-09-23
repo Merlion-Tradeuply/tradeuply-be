@@ -47,3 +47,15 @@ export const otpResendRateLimiter = createClientRateLimiter({
   message: "Too many OTP resend requests. Please try again later.",
   windowMs: 15 * 60 * 1000,
 });
+
+export const passwordResetRequestRateLimiter = createClientRateLimiter({
+  limit: 5,
+  message: "Too many password reset requests. Please try again later.",
+  windowMs: 15 * 60 * 1000,
+});
+
+export const passwordResetCompletionRateLimiter = createClientRateLimiter({
+  limit: 10,
+  message: "Too many password reset attempts. Please try again later.",
+  windowMs: 15 * 60 * 1000,
+});
