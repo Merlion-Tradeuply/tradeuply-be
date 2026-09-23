@@ -41,9 +41,10 @@ const clientInvestmentSchema = new mongoose.Schema(
     requestId: { required: true, type: String },
     startsAt: { required: true, type: Date },
     maturesAt: { required: true, type: Date },
+    capitalReturnedAt: { default: null, type: Date },
     status: {
       default: "active",
-      enum: ["active", "completed", "cancelled"],
+      enum: ["active", "matured", "completed", "cancelled"],
       index: true,
       type: String,
     },

@@ -1,7 +1,11 @@
 import { connectDatabase, disconnectDatabase } from "../config/database.js";
 import { BalanceTransaction } from "../models/balance-transaction.model.js";
 
-const obsoleteIndexes = ["deposit_1", "investment_1"];
+const obsoleteIndexes = [
+  "deposit_1",
+  "investment_1",
+  "investment_unique_when_present",
+];
 
 async function dropIndexIfPresent(indexName) {
   const indexes = await BalanceTransaction.collection.indexes();
@@ -28,9 +32,9 @@ async function migrateBalanceTransactionIndexes() {
     },
   );
   await BalanceTransaction.collection.createIndex(
-    { investment: 1 },
+    { investment: 1, type: 1 },
     {
-      name: "investment_unique_when_present",
+      name: "investment_type_unique_when_present",
       partialFilterExpression: { investment: { $type: "objectId" } },
       unique: true,
     },

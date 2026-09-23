@@ -4,10 +4,12 @@ import { BalanceTransaction } from "../models/balance-transaction.model.js";
 import { Balance } from "../models/balance.model.js";
 import { ClientInvestment } from "../models/client-investment.model.js";
 import { InvestmentPlan } from "../models/investment-plan.model.js";
+import { InvestmentProfit } from "../models/investment-profit.model.js";
 import { AppError } from "../utils/app-error.js";
 import { convertCurrency } from "./currency.service.js";
 
 const decimalPrecision = 8;
+const dayInMilliseconds = 24 * 60 * 60 * 1000;
 
 function decimalToUnits(value) {
   const [whole, fraction = ""] = String(value).split(".");
@@ -21,14 +23,145 @@ function unitsToDecimal(units) {
   return fraction ? `${whole}.${fraction}` : whole;
 }
 
-function serializeInvestment(investment) {
+function addDecimals(left, right) {
+  return unitsToDecimal(decimalToUnits(left) + decimalToUnits(right));
+}
+
+function sumDecimals(values) {
+  return unitsToDecimal(
+    values.reduce((total, value) => total + decimalToUnits(value), 0n),
+  );
+}
+
+export function getCompletedProfitDays(investment, now = new Date()) {
+  const elapsed = Math.max(0, now.getTime() - investment.startsAt.getTime());
+  return Math.min(
+    investment.planSnapshot.horizonDays,
+    Math.floor(elapsed / dayInMilliseconds),
+  );
+}
+
+function getDailyProfit(investment) {
+  const amountUsd = Number(investment.amountUsd.toString());
+  const rate = Number(investment.exchangeRate.toString());
+  const dailyUsd = amountUsd * (investment.planSnapshot.dailyObjective / 100);
+
+  return {
+    amountUsd: dailyUsd.toFixed(2),
+    walletAmount: (dailyUsd * rate).toFixed(decimalPrecision),
+  };
+}
+
+async function syncInvestmentLifecycle(investment, now = new Date()) {
+  const accruedDays = getCompletedProfitDays(investment, now);
+  const dailyProfit = getDailyProfit(investment);
+
+  if (accruedDays > 0 && investment.status !== "cancelled") {
+    const operations = Array.from({ length: accruedDays }, (_, index) => {
+      const dayNumber = index + 1;
+      return {
+        updateOne: {
+          filter: { dayNumber, investment: investment._id },
+          update: {
+            $setOnInsert: {
+              amountUsd: mongoose.Types.Decimal128.fromString(dailyProfit.amountUsd),
+              client: investment.client,
+              creditDate: new Date(
+                investment.startsAt.getTime() + dayNumber * dayInMilliseconds,
+              ),
+              dayNumber,
+              investment: investment._id,
+              status: "available",
+              walletAmount: mongoose.Types.Decimal128.fromString(
+                dailyProfit.walletAmount,
+              ),
+              walletCurrency: investment.walletCurrency,
+            },
+          },
+          upsert: true,
+        },
+      };
+    });
+
+    try {
+      await InvestmentProfit.bulkWrite(operations, { ordered: false });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+    }
+  }
+
+  if (investment.status === "active" && now >= investment.maturesAt) {
+    await ClientInvestment.updateOne(
+      { _id: investment._id, status: "active" },
+      { $set: { status: "matured" } },
+    );
+    investment.status = "matured";
+  }
+
+  return InvestmentProfit.find({ investment: investment._id }).sort({ dayNumber: 1 });
+}
+
+function serializeProfit(profit) {
+  return {
+    amountUsd: profit.amountUsd.toString(),
+    creditDate: profit.creditDate,
+    dayNumber: profit.dayNumber,
+    id: profit.id,
+    status: profit.status,
+    walletAmount: profit.walletAmount.toString(),
+    walletCurrency: profit.walletCurrency,
+    withdrawnAt: profit.withdrawnAt,
+  };
+}
+
+function serializeInvestment(investment, profits = [], includeHistory = false) {
+  const now = new Date();
+  const accruedDays = getCompletedProfitDays(investment, now);
+  const horizonDays = investment.planSnapshot.horizonDays;
+  const availableProfits = profits.filter((profit) => profit.status === "available");
+  const withdrawnProfits = profits.filter((profit) => profit.status === "withdrawn");
+  const dailyProfit = getDailyProfit(investment);
+  const elapsed = Math.max(0, now.getTime() - investment.startsAt.getTime());
+  const duration = Math.max(
+    1,
+    investment.maturesAt.getTime() - investment.startsAt.getTime(),
+  );
+
   return {
     amountUsd: investment.amountUsd.toString(),
+    capitalReturnedAt: investment.capitalReturnedAt,
     createdAt: investment.createdAt,
+    daysCompleted: accruedDays,
+    daysRemaining: Math.max(0, horizonDays - accruedDays),
     exchangeRate: investment.exchangeRate.toString(),
     id: investment.id,
     maturesAt: investment.maturesAt,
     plan: investment.planSnapshot,
+    profit: {
+      accruedDays: profits.length,
+      availableUsd: sumDecimals(
+        availableProfits.map((profit) => profit.amountUsd.toString()),
+      ),
+      availableWalletAmount: sumDecimals(
+        availableProfits.map((profit) => profit.walletAmount.toString()),
+      ),
+      dailyUsd: dailyProfit.amountUsd,
+      dailyWalletAmount: dailyProfit.walletAmount,
+      ...(includeHistory ? { entries: profits.map(serializeProfit) } : {}),
+      totalAccruedUsd: sumDecimals(
+        profits.map((profit) => profit.amountUsd.toString()),
+      ),
+      totalAccruedWalletAmount: sumDecimals(
+        profits.map((profit) => profit.walletAmount.toString()),
+      ),
+      withdrawnUsd: sumDecimals(
+        withdrawnProfits.map((profit) => profit.amountUsd.toString()),
+      ),
+      withdrawnWalletAmount: sumDecimals(
+        withdrawnProfits.map((profit) => profit.walletAmount.toString()),
+      ),
+    },
+    progressPercent: Math.min(100, Math.round((elapsed / duration) * 100)),
     projectedProfitUsd: investment.projectedProfitUsd.toString(),
     projectedTotalUsd: investment.projectedTotalUsd.toString(),
     quoteExpiresAt: investment.quoteExpiresAt,
@@ -41,12 +174,37 @@ function serializeInvestment(investment) {
   };
 }
 
+async function findOwnedInvestment(clientId, investmentId, session) {
+  if (!mongoose.isValidObjectId(investmentId)) {
+    throw new AppError("The investment could not be found.", {
+      code: "INVESTMENT_NOT_FOUND",
+      statusCode: 404,
+    });
+  }
+
+  const query = ClientInvestment.findOne({ _id: investmentId, client: clientId });
+  if (session) query.session(session);
+  const investment = await query;
+
+  if (!investment) {
+    throw new AppError("The investment could not be found.", {
+      code: "INVESTMENT_NOT_FOUND",
+      statusCode: 404,
+    });
+  }
+
+  return investment;
+}
+
 export async function createClientInvestment(clientId, payload) {
   const existingInvestment = await ClientInvestment.findOne({
     client: clientId,
     requestId: payload.requestId,
   });
-  if (existingInvestment) return serializeInvestment(existingInvestment);
+  if (existingInvestment) {
+    const profits = await syncInvestmentLifecycle(existingInvestment);
+    return serializeInvestment(existingInvestment, profits);
+  }
 
   const plan = await InvestmentPlan.findOne({
     _id: payload.planId,
@@ -164,5 +322,85 @@ export async function listClientInvestments(clientId) {
   const investments = await ClientInvestment.find({ client: clientId }).sort({
     createdAt: -1,
   });
-  return investments.map(serializeInvestment);
+
+  return Promise.all(
+    investments.map(async (investment) => {
+      const profits = await syncInvestmentLifecycle(investment);
+      return serializeInvestment(investment, profits);
+    }),
+  );
+}
+
+export async function getClientInvestment(clientId, investmentId) {
+  const investment = await findOwnedInvestment(clientId, investmentId);
+  const profits = await syncInvestmentLifecycle(investment);
+  return serializeInvestment(investment, profits, true);
+}
+
+export async function transferInvestmentCapital(clientId, investmentId) {
+  const session = await mongoose.startSession();
+  let investment;
+
+  try {
+    await session.withTransaction(async () => {
+      investment = await findOwnedInvestment(clientId, investmentId, session);
+
+      if (investment.capitalReturnedAt || investment.status === "completed") return;
+      if (new Date() < investment.maturesAt) {
+        throw new AppError("Capital is available only after the investment matures.", {
+          code: "INVESTMENT_NOT_MATURED",
+          statusCode: 409,
+        });
+      }
+
+      let balance = await Balance.findOne({
+        client: clientId,
+        currency: investment.walletCurrency,
+      }).session(session);
+      if (!balance) {
+        [balance] = await Balance.create(
+          [{ client: clientId, currency: investment.walletCurrency }],
+          { session },
+        );
+      }
+
+      const balanceBefore = balance.availableBalance.toString();
+      const balanceAfter = addDecimals(
+        balanceBefore,
+        investment.walletAmount.toString(),
+      );
+      const now = new Date();
+
+      balance.availableBalance = mongoose.Types.Decimal128.fromString(balanceAfter);
+      balance.lastTransactionAt = now;
+      await balance.save({ session });
+
+      investment.capitalReturnedAt = now;
+      investment.status = "completed";
+      await investment.save({ session });
+
+      await BalanceTransaction.create(
+        [
+          {
+            amount: investment.walletAmount,
+            balance: balance._id,
+            balanceAfter: mongoose.Types.Decimal128.fromString(balanceAfter),
+            balanceBefore: mongoose.Types.Decimal128.fromString(balanceBefore),
+            client: clientId,
+            currency: investment.walletCurrency,
+            description: `Capital returned from ${investment.planSnapshot.name}`,
+            direction: "credit",
+            investment: investment._id,
+            type: "capital_return",
+          },
+        ],
+        { session },
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  const profits = await syncInvestmentLifecycle(investment);
+  return serializeInvestment(investment, profits, true);
 }

@@ -8,6 +8,11 @@ import {
 import { currencyConversionQuerySchema } from "../src/validators/currency.validator.js";
 import { createClientInvestmentSchema } from "../src/validators/client-investment.validator.js";
 import {
+  completeClientPaymentMethodQrUploadSchema,
+  createClientPaymentMethodSchema,
+  updateClientPaymentMethodSchema,
+} from "../src/validators/client-payment-method.validator.js";
+import {
   createInvestmentPlanSchema,
   deleteInvestmentPlansSchema,
   investmentPlanQuerySchema,
@@ -76,6 +81,31 @@ describe("deposit validation", () => {
     assert.equal(validResult.success, true);
     assert.equal(validResult.data?.walletCurrency, "BTC");
     assert.equal(invalidResult.success, false);
+  });
+
+  it("validates client wallet payment methods and QR uploads", () => {
+    const method = createClientPaymentMethodSchema.safeParse({
+      asset: "eth",
+      isDefault: true,
+      label: "My primary wallet",
+      network: "Ethereum",
+      walletAddress: "0x1234567890abcdef",
+    });
+    const update = updateClientPaymentMethodSchema.safeParse({ label: "Cold wallet" });
+    const upload = completeClientPaymentMethodQrUploadSchema.safeParse({
+      bytes: 128000,
+      format: "png",
+      height: 512,
+      publicId: "tradeuply/client-payment-methods/client/method/qr-code/wallet-qr",
+      signature: "cloudinary-response-signature",
+      version: 1800000000,
+      width: 512,
+    });
+
+    assert.equal(method.success, true);
+    assert.equal(method.data?.asset, "ETH");
+    assert.equal(update.success, true);
+    assert.equal(upload.success, true);
   });
 
   it("allows a super-admin to configure a cryptocurrency wallet", () => {

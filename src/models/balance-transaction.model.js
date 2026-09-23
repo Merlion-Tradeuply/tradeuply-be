@@ -29,7 +29,13 @@ const balanceTransactionSchema = new mongoose.Schema(
     deletedAt: { default: null, index: true, type: Date },
     direction: { enum: ["credit", "debit"], required: true, type: String },
     type: {
-      enum: ["deposit", "withdrawal", "adjustment", "investment"],
+      enum: [
+        "deposit",
+        "withdrawal",
+        "adjustment",
+        "investment",
+        "capital_return",
+      ],
       required: true,
       type: String,
     },
@@ -47,9 +53,9 @@ balanceTransactionSchema.index(
   },
 );
 balanceTransactionSchema.index(
-  { investment: 1 },
+  { investment: 1, type: 1 },
   {
-    name: "investment_unique_when_present",
+    name: "investment_type_unique_when_present",
     partialFilterExpression: { investment: { $type: "objectId" } },
     unique: true,
   },
