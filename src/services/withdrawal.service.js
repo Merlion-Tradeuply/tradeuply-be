@@ -89,7 +89,7 @@ export async function submitWithdrawal(client, payload, request) {
         destinationWalletAddress: method.walletAddress,
         paymentMethod: method._id,
         requestId: payload.requestId,
-      }], { session });
+      }], { ordered: true, session });
 
       balance.availableBalance = decimal(available - requested);
       balance.lockedBalance = decimal(toUnits(balance.lockedBalance?.toString() ?? "0") + requested);
@@ -98,7 +98,7 @@ export async function submitWithdrawal(client, payload, request) {
       await WithdrawalActivity.create([
         { actorId: client._id, actorLabel: `${client.firstName} ${client.lastName}`, actorType: "client", event: "submitted", newStatus: "pending", withdrawal: withdrawal._id, ...context(request) },
         { actorType: "system", event: "balance_reserved", metadata: { amount: withdrawal.amount.toString(), asset }, newStatus: "pending", withdrawal: withdrawal._id },
-      ], { session });
+      ], { ordered: true, session });
       result = withdrawal;
     });
   } catch (error) {
@@ -173,14 +173,14 @@ export async function reviewWithdrawal(id, payload, user, request) {
         balance.totalWithdrawn = decimal(toUnits(balance.totalWithdrawn?.toString() ?? "0") + amount);
         balance.lastTransactionAt = new Date();
         await balance.save({ session });
-        await BalanceTransaction.create([{ amount: decimal(amount), balance: balance._id, balanceAfter: decimal(totalBefore - amount), balanceBefore: decimal(totalBefore), client: withdrawal.client, currency: withdrawal.asset, description: `Withdrawal to ${withdrawal.destinationLabel}`, direction: "debit", type: "withdrawal", withdrawal: withdrawal._id }], { session });
+        await BalanceTransaction.create([{ amount: decimal(amount), balance: balance._id, balanceAfter: decimal(totalBefore - amount), balanceBefore: decimal(totalBefore), client: withdrawal.client, currency: withdrawal.asset, description: `Withdrawal to ${withdrawal.destinationLabel}`, direction: "debit", type: "withdrawal", withdrawal: withdrawal._id }], { ordered: true, session });
       } else {
         balance.lockedBalance = decimal(locked - amount);
         balance.availableBalance = decimal(toUnits(balance.availableBalance.toString()) + amount);
         await balance.save({ session });
       }
 
-      await WithdrawalActivity.create([{ actorId: user._id, actorLabel: `${user.firstName} ${user.lastName}`, actorType: "internal", event: nextStatus, metadata: { notes: payload.notes }, newStatus: nextStatus, previousStatus: "pending", withdrawal: withdrawal._id, ...context(request) }, { actorType: "system", event: nextStatus === "approved" ? "balance_debited" : "balance_released", metadata: { amount: withdrawal.amount.toString(), asset: withdrawal.asset }, newStatus: nextStatus, withdrawal: withdrawal._id }], { session });
+      await WithdrawalActivity.create([{ actorId: user._id, actorLabel: `${user.firstName} ${user.lastName}`, actorType: "internal", event: nextStatus, metadata: { notes: payload.notes }, newStatus: nextStatus, previousStatus: "pending", withdrawal: withdrawal._id, ...context(request) }, { actorType: "system", event: nextStatus === "approved" ? "balance_debited" : "balance_released", metadata: { amount: withdrawal.amount.toString(), asset: withdrawal.asset }, newStatus: nextStatus, withdrawal: withdrawal._id }], { ordered: true, session });
       result = withdrawal;
     });
   } finally { await session.endSession(); }
