@@ -35,10 +35,10 @@ export const env = Object.freeze({
     .filter(Boolean),
   contactNotificationEmail:
     process.env.CONTACT_NOTIFICATION_EMAIL?.trim().toLowerCase() ??
-    "merlionasset@gmail.com",
+    "vijayharsh63@gmail.com",
   depositNotificationEmail:
     process.env.DEPOSIT_NOTIFICATION_EMAIL?.trim().toLowerCase() ??
-    "merlionasset@gmail.com",
+    "vijayharsh63@gmail.com",
   mongoUri: process.env.MONGO_URI?.trim() ?? "",
   nodeEnv: process.env.NODE_ENV ?? "development",
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET?.trim() ?? "",
