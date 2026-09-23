@@ -7,6 +7,7 @@ import {
   getClientLedger,
   listClientDeposits,
 } from "./deposit.service.js";
+import { listClientInvestments } from "./client-investment.service.js";
 
 function serializeClient(client, balances = []) {
   return {
@@ -119,9 +120,10 @@ export async function getManagedClient(clientId) {
     });
   }
 
-  const [balances, deposits, transactions] = await Promise.all([
+  const [balances, deposits, investments, transactions] = await Promise.all([
     getClientBalances(client._id),
     listClientDeposits(client._id),
+    listClientInvestments(client._id),
     getClientLedger(client._id),
   ]);
 
@@ -129,6 +131,7 @@ export async function getManagedClient(clientId) {
     balances,
     client: serializeClient(client, balances),
     deposits,
+    investments,
     transactions,
   };
 }
