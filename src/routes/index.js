@@ -10,6 +10,7 @@ import { dashboardRouter } from "./dashboard.routes.js";
 import { depositRouter } from "./deposit.routes.js";
 import { paymentMethodRouter } from "./payment-method.routes.js";
 import { transactionRouter } from "./transaction.routes.js";
+import { withdrawalRouter } from "./withdrawal.routes.js";
 
 export const apiRouter = Router();
 
@@ -23,3 +24,4 @@ apiRouter.use("/internal", internalRouter);
 apiRouter.use("/investment-plans", investmentPlanRouter);
 apiRouter.use("/payment-methods", paymentMethodRouter);
 apiRouter.use("/transactions", transactionRouter);
+apiRouter.use("/withdrawals", withdrawalRouter);

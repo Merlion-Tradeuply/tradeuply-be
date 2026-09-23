@@ -20,8 +20,6 @@ const depositSchema = new mongoose.Schema(
       required: true,
       type: mongoose.Schema.Types.ObjectId,
     },
-    paymentProofPublicId: { maxlength: 300, required: true, trim: true, type: String },
-    paymentProofUrl: { maxlength: 500, required: true, trim: true, type: String },
     reviewNotes: { default: "", maxlength: 1000, trim: true, type: String },
     reviewedAt: { default: null, type: Date },
     reviewedBy: { default: null, ref: "User", type: mongoose.Schema.Types.ObjectId },

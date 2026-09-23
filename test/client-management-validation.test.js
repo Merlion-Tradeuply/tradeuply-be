@@ -3,10 +3,24 @@ import { describe, it } from "node:test";
 
 import {
   deleteManagedClientsSchema,
+  managedClientQuerySchema,
   updateManagedClientSchema,
 } from "../src/validators/client-management.validator.js";
 
 describe("client management validation", () => {
+  it("validates client filters and pagination", () => {
+    const result = managedClientQuerySchema.safeParse({
+      limit: "20",
+      page: "2",
+      query: "client@example.com",
+      status: "active",
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.data.limit, 20);
+    assert.equal(result.data.page, 2);
+  });
+
   it("accepts editable client profile fields", () => {
     const result = updateManagedClientSchema.safeParse({
       experience: "Experienced",

@@ -14,3 +14,16 @@ export const createClientInvestmentSchema = z
       .regex(/^[A-Z0-9-]+$/),
   })
   .strict();
+
+export const withdrawClientInvestmentProfitSchema = z
+  .object({
+    requestId: z.string().uuid("Invalid profit withdrawal request ID."),
+    walletCurrency: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .min(2)
+      .max(20)
+      .regex(/^[A-Z0-9-]+$/),
+  })
+  .strict();

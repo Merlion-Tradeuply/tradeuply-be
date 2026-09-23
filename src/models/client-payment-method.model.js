@@ -18,8 +18,6 @@ const clientPaymentMethodSchema = new mongoose.Schema(
     isDefault: { default: false, type: Boolean },
     label: { maxlength: 80, required: true, trim: true, type: String },
     network: { maxlength: 40, required: true, trim: true, type: String },
-    qrCodePublicId: { default: null, maxlength: 300, trim: true, type: String },
-    qrCodeUrl: { default: null, maxlength: 500, trim: true, type: String },
     walletAddress: { maxlength: 200, required: true, trim: true, type: String },
   },
   { timestamps: true, versionKey: false },

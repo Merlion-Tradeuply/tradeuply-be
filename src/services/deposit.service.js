@@ -1,18 +1,13 @@
 import mongoose from "mongoose";
 
 import { BalanceTransaction } from "../models/balance-transaction.model.js";
+import { Client } from "../models/client.model.js";
 import { DepositActivity } from "../models/deposit-activity.model.js";
 import { Deposit } from "../models/deposit.model.js";
 import { AppError } from "../utils/app-error.js";
 import { creditDepositBalance } from "./balance.service.js";
 import { getActivePaymentMethod } from "./payment-method.service.js";
 import { sendDepositSubmittedEmails } from "./email.service.js";
-import {
-  buildUploadFolder,
-  deleteUploadedFile,
-  getUploadResourceType,
-  uploadFile,
-} from "./upload.service.js";
 
 function serializeActivity(activity) {
   return {
@@ -49,7 +44,6 @@ function serializeDeposit(deposit, activities = []) {
     methodCode: deposit.methodCode,
     methodName: deposit.methodName,
     network: deposit.network,
-    paymentProofUrl: deposit.paymentProofUrl ?? null,
     reviewNotes: deposit.reviewNotes,
     reviewedAt: deposit.reviewedAt,
     senderWalletAddress: deposit.senderWalletAddress,
@@ -66,7 +60,7 @@ function requestContext(request) {
   };
 }
 
-export async function submitDeposit(client, payload, request, paymentProof) {
+export async function submitDeposit(client, payload, request) {
   const method = await getActivePaymentMethod(payload.paymentMethodId);
   const asset = method.asset.trim().toUpperCase();
 
@@ -84,27 +78,7 @@ export async function submitDeposit(client, payload, request, paymentProof) {
     });
   }
 
-  if (!paymentProof) {
-    throw new AppError("Upload a screenshot of the completed payment.", {
-      code: "PAYMENT_PROOF_REQUIRED",
-      statusCode: 422,
-    });
-  }
-
-  if (getUploadResourceType(paymentProof.mimetype) !== "image") {
-    throw new AppError("The payment screenshot must be a PNG, JPEG, or WebP image.", {
-      code: "PAYMENT_PROOF_IMAGE_REQUIRED",
-      statusCode: 415,
-    });
-  }
-
   const depositId = new mongoose.Types.ObjectId();
-  const proofAsset = await uploadFile({
-    buffer: paymentProof.buffer,
-    folder: buildUploadFolder("deposits", client.id, depositId.toString(), "payment-proof"),
-    mimeType: paymentProof.mimetype,
-    publicId: "transaction-screenshot",
-  });
 
   try {
     const deposit = await Deposit.create({
@@ -118,8 +92,6 @@ export async function submitDeposit(client, payload, request, paymentProof) {
       methodName: method.name,
       network: method.network,
       paymentMethod: method._id,
-      paymentProofPublicId: proofAsset.publicId,
-      paymentProofUrl: proofAsset.secureUrl,
       senderWalletAddress: payload.senderWalletAddress,
       transactionHash: payload.transactionHash,
     });
@@ -147,8 +119,6 @@ export async function submitDeposit(client, payload, request, paymentProof) {
 
     return serializedDeposit;
   } catch (error) {
-    await deleteUploadedFile(proofAsset.publicId).catch(() => undefined);
-
     if (error?.code === 11000) {
       throw new AppError("This transaction hash has already been submitted.", {
         code: "DUPLICATE_TRANSACTION_HASH",
@@ -178,12 +148,80 @@ export async function getClientDeposit(clientId, depositId) {
   return serializeDeposit(deposit, activities);
 }
 
-export async function listAdminDeposits(status) {
-  const filter = status && status !== "all" ? { status } : {};
-  const deposits = await Deposit.find(filter)
-    .populate("client", "firstName lastName email")
-    .sort({ createdAt: -1 });
-  return deposits.map((deposit) => serializeDeposit(deposit));
+function escapeRegularExpression(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function getAdminDepositSearchFilter(query) {
+  if (!query) return null;
+
+  const expression = new RegExp(escapeRegularExpression(query), "i");
+  const clients = await Client.find({
+    $or: [
+      { email: expression },
+      { firstName: expression },
+      { lastName: expression },
+    ],
+  })
+    .select("_id")
+    .lean();
+  const options = [
+    { asset: expression },
+    { client: { $in: clients.map((client) => client._id) } },
+    { methodName: expression },
+    { network: expression },
+    { senderWalletAddress: expression },
+    { transactionHash: expression },
+  ];
+
+  if (/^\d+(\.\d+)?$/.test(query)) {
+    options.push({ amount: mongoose.Types.Decimal128.fromString(query) });
+  }
+
+  return { $or: options };
+}
+
+export async function listAdminDeposits({
+  limit = 10,
+  page = 1,
+  q = "",
+  status = "all",
+} = {}) {
+  const filter = {};
+  const skip = (page - 1) * limit;
+
+  if (status !== "all") filter.status = status;
+  const searchFilter = await getAdminDepositSearchFilter(q);
+  if (searchFilter) Object.assign(filter, searchFilter);
+
+  const [deposits, statusCounts, total] = await Promise.all([
+    Deposit.find(filter)
+      .populate("client", "firstName lastName email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Deposit.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    Deposit.countDocuments(filter),
+  ]);
+  const summary = { all: 0, approved: 0, pending: 0, rejected: 0 };
+
+  for (const item of statusCounts) {
+    if (item._id in summary) summary[item._id] = item.count;
+    summary.all += item.count;
+  }
+
+  return {
+    deposits: deposits.map((deposit) => serializeDeposit(deposit)),
+    pagination: {
+      limit,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      total,
+    },
+    summary,
+  };
 }
 
 export async function getAdminDeposit(depositId) {

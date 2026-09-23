@@ -33,8 +33,17 @@ export async function listPublicInvestmentPlans() {
   return plans.map(serializePlan);
 }
 
-export async function listInvestmentPlans({ featured, q, risk, sort, status } = {}) {
+export async function listInvestmentPlans({
+  featured,
+  limit = 10,
+  page = 1,
+  q,
+  risk,
+  sort,
+  status,
+} = {}) {
   const filter = { deletedAt: null };
+  const skip = (page - 1) * limit;
   if (featured) filter.isFeatured = featured === "true";
   if (risk) filter.risk = risk;
   if (status) filter.status = status;
@@ -52,8 +61,11 @@ export async function listInvestmentPlans({ featured, q, risk, sort, status } = 
     "name-asc": { name: 1 },
     "name-desc": { name: -1 },
   };
-  const [plans, statusCounts, risks] = await Promise.all([
-    InvestmentPlan.find(filter).sort(sortOptions[sort] ?? sortOptions["display-order"]),
+  const [plans, statusCounts, risks, total] = await Promise.all([
+    InvestmentPlan.find(filter)
+      .sort(sortOptions[sort] ?? sortOptions["display-order"])
+      .skip(skip)
+      .limit(limit),
     InvestmentPlan.aggregate([
       { $match: { deletedAt: null } },
       {
@@ -70,10 +82,17 @@ export async function listInvestmentPlans({ featured, q, risk, sort, status } = 
       },
     ]),
     InvestmentPlan.distinct("risk", { deletedAt: null }),
+    InvestmentPlan.countDocuments(filter),
   ]);
   const counts = statusCounts[0];
 
   return {
+    pagination: {
+      limit,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      total,
+    },
     plans: plans.map(serializePlan),
     risks: risks.sort((a, b) => a.localeCompare(b)),
     summary: {

@@ -2,12 +2,6 @@ import mongoose from "mongoose";
 
 import { ClientPaymentMethod } from "../models/client-payment-method.model.js";
 import { AppError } from "../utils/app-error.js";
-import {
-  buildUploadFolder,
-  createSignedImageUpload,
-  deleteUploadedFile,
-  verifySignedImageUpload,
-} from "./upload.service.js";
 
 function serializeClientPaymentMethod(method) {
   return {
@@ -17,7 +11,6 @@ function serializeClientPaymentMethod(method) {
     isDefault: method.isDefault,
     label: method.label,
     network: method.network,
-    qrCodeUrl: method.qrCodeUrl,
     updatedAt: method.updatedAt,
     walletAddress: method.walletAddress,
   };
@@ -102,7 +95,6 @@ export async function deleteClientPaymentMethod(clientId, methodId) {
   const method = await findOwnedPaymentMethod(clientId, methodId);
   const wasDefault = method.isDefault;
 
-  if (method.qrCodePublicId) await deleteUploadedFile(method.qrCodePublicId);
   await method.deleteOne();
 
   if (wasDefault) {
@@ -116,41 +108,4 @@ export async function deleteClientPaymentMethod(clientId, methodId) {
   }
 
   return { deletedId: methodId };
-}
-
-export async function createClientPaymentMethodQrSignature(clientId, methodId) {
-  await findOwnedPaymentMethod(clientId, methodId);
-  return createSignedImageUpload({
-    folder: buildUploadFolder(
-      "client-payment-methods",
-      clientId,
-      methodId,
-      "qr-code",
-    ),
-    publicId: "wallet-qr",
-  });
-}
-
-export async function completeClientPaymentMethodQrUpload(
-  clientId,
-  methodId,
-  uploadResponse,
-) {
-  const method = await findOwnedPaymentMethod(clientId, methodId);
-  const folder = buildUploadFolder(
-    "client-payment-methods",
-    clientId,
-    methodId,
-    "qr-code",
-  );
-  const asset = verifySignedImageUpload({
-    ...uploadResponse,
-    expectedPublicId: `${folder}/wallet-qr`,
-  });
-
-  method.qrCodePublicId = asset.publicId;
-  method.qrCodeUrl = asset.secureUrl;
-  await method.save();
-
-  return serializeClientPaymentMethod(method);
 }

@@ -2,16 +2,20 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  adminDepositQuerySchema,
   createDepositSchema,
   reviewDepositSchema,
 } from "../src/validators/deposit.validator.js";
 import { currencyConversionQuerySchema } from "../src/validators/currency.validator.js";
-import { createClientInvestmentSchema } from "../src/validators/client-investment.validator.js";
 import {
-  completeClientPaymentMethodQrUploadSchema,
+  createClientInvestmentSchema,
+  withdrawClientInvestmentProfitSchema,
+} from "../src/validators/client-investment.validator.js";
+import {
   createClientPaymentMethodSchema,
   updateClientPaymentMethodSchema,
 } from "../src/validators/client-payment-method.validator.js";
+import { clientTransactionQuerySchema } from "../src/validators/client-transaction.validator.js";
 import {
   createInvestmentPlanSchema,
   deleteInvestmentPlansSchema,
@@ -27,8 +31,22 @@ import {
   deleteTransactionsSchema,
   transactionQuerySchema,
 } from "../src/validators/transaction.validator.js";
+import { createWithdrawalSchema, reviewWithdrawalSchema } from "../src/validators/withdrawal.validator.js";
 
 describe("deposit validation", () => {
+  it("validates admin deposit filters and pagination", () => {
+    const result = adminDepositQuerySchema.safeParse({
+      limit: "20",
+      page: "2",
+      q: "transaction hash",
+      status: "pending",
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.data.limit, 20);
+    assert.equal(result.data.page, 2);
+  });
+
   it("accepts a complete cryptocurrency deposit submission", () => {
     const result = createDepositSchema.safeParse({
       amount: 125.5,
@@ -83,7 +101,41 @@ describe("deposit validation", () => {
     assert.equal(invalidResult.success, false);
   });
 
-  it("validates client wallet payment methods and QR uploads", () => {
+  it("validates internal profit withdrawals", () => {
+    const validResult = withdrawClientInvestmentProfitSchema.safeParse({
+      requestId: "9cf1bf00-b6f8-4f3a-8b98-ae4f890a0bc4",
+      walletCurrency: "sol",
+    });
+    const invalidResult = withdrawClientInvestmentProfitSchema.safeParse({
+      requestId: "not-a-request-id",
+      walletCurrency: "",
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(validResult.data?.walletCurrency, "SOL");
+    assert.equal(invalidResult.success, false);
+  });
+
+  it("validates client transaction filters and pagination", () => {
+    const result = clientTransactionQuerySchema.safeParse({
+      currency: "btc",
+      direction: "credit",
+      from: "2026-09-01",
+      limit: "20",
+      page: "2",
+      q: "profit",
+      sort: "oldest",
+      to: "2026-09-30",
+      type: "profit_withdrawal",
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.data?.currency, "BTC");
+    assert.equal(result.data?.limit, 20);
+    assert.equal(result.data?.page, 2);
+  });
+
+  it("validates client wallet payment methods", () => {
     const method = createClientPaymentMethodSchema.safeParse({
       asset: "eth",
       isDefault: true,
@@ -92,20 +144,18 @@ describe("deposit validation", () => {
       walletAddress: "0x1234567890abcdef",
     });
     const update = updateClientPaymentMethodSchema.safeParse({ label: "Cold wallet" });
-    const upload = completeClientPaymentMethodQrUploadSchema.safeParse({
-      bytes: 128000,
-      format: "png",
-      height: 512,
-      publicId: "tradeuply/client-payment-methods/client/method/qr-code/wallet-qr",
-      signature: "cloudinary-response-signature",
-      version: 1800000000,
-      width: 512,
-    });
-
     assert.equal(method.success, true);
     assert.equal(method.data?.asset, "ETH");
     assert.equal(update.success, true);
-    assert.equal(upload.success, true);
+  });
+
+  it("validates withdrawal submission and review", () => {
+    const request = createWithdrawalSchema.safeParse({ amount: 0.25, paymentMethodId: "507f1f77bcf86cd799439011", requestId: "9cf1bf00-b6f8-4f3a-8b98-ae4f890a0bc4" });
+    const rejection = reviewWithdrawalSchema.safeParse({ action: "reject", notes: "Wallet could not be verified." });
+    const invalidRejection = reviewWithdrawalSchema.safeParse({ action: "reject", notes: "" });
+    assert.equal(request.success, true);
+    assert.equal(rejection.success, true);
+    assert.equal(invalidRejection.success, false);
   });
 
   it("allows a super-admin to configure a cryptocurrency wallet", () => {
@@ -155,6 +205,8 @@ describe("deposit validation", () => {
   it("validates payment-method API filters", () => {
     const validResult = paymentMethodQuerySchema.safeParse({
       category: "crypto",
+      limit: "20",
+      page: "2",
       q: "bitcoin",
       sort: "name-asc",
       status: "active",
@@ -165,12 +217,16 @@ describe("deposit validation", () => {
     });
 
     assert.equal(validResult.success, true);
+    assert.equal(validResult.data.limit, 20);
+    assert.equal(validResult.data.page, 2);
     assert.equal(invalidResult.success, false);
   });
 
   it("validates transaction filters and bulk deletion", () => {
     const filters = transactionQuerySchema.safeParse({
       direction: "credit",
+      limit: "20",
+      page: "2",
       q: "client@example.com",
       type: "deposit",
     });
@@ -180,6 +236,8 @@ describe("deposit validation", () => {
     const invalidDeletion = deleteTransactionsSchema.safeParse({ ids: [] });
 
     assert.equal(filters.success, true);
+    assert.equal(filters.data.limit, 20);
+    assert.equal(filters.data.page, 2);
     assert.equal(deletion.success, true);
     assert.equal(invalidDeletion.success, false);
   });
@@ -202,6 +260,8 @@ describe("deposit validation", () => {
     });
     const filters = investmentPlanQuerySchema.safeParse({
       featured: "true",
+      limit: "20",
+      page: "2",
       q: "balanced",
       sort: "minimum-asc",
       status: "active",
@@ -212,6 +272,8 @@ describe("deposit validation", () => {
 
     assert.equal(plan.success, true);
     assert.equal(filters.success, true);
+    assert.equal(filters.data.limit, 20);
+    assert.equal(filters.data.page, 2);
     assert.equal(deletion.success, true);
   });
 });

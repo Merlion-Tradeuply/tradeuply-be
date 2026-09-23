@@ -6,6 +6,8 @@ const nullableText = (maximum) => z.string().trim().max(maximum).nullable().opti
 export const paymentMethodQuerySchema = z
   .object({
     category: z.enum(["bank", "card", "crypto", "wallet"]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    page: z.coerce.number().int().min(1).default(1),
     q: z.string().trim().max(100).optional(),
     sort: z.enum(["display-order", "name-asc", "name-desc"]).default("display-order"),
     status: z.enum(["active", "coming_soon", "disabled"]).optional(),

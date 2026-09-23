@@ -8,10 +8,14 @@ import {
 } from "../controllers/client-management.controller.js";
 import { authorizeRoles } from "../middleware/authorize-roles.js";
 import { authenticateUser } from "../middleware/user-authentication.js";
-import { validateRequest } from "../middleware/validate-request.js";
+import {
+  validateQuery,
+  validateRequest,
+} from "../middleware/validate-request.js";
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   deleteManagedClientsSchema,
+  managedClientQuerySchema,
   updateManagedClientSchema,
 } from "../validators/client-management.validator.js";
 
@@ -19,7 +23,11 @@ export const clientManagementRouter = Router();
 
 clientManagementRouter.use(asyncHandler(authenticateUser));
 clientManagementRouter.use(authorizeRoles("super-admin", "admin"));
-clientManagementRouter.get("/", asyncHandler(getClients));
+clientManagementRouter.get(
+  "/",
+  validateQuery(managedClientQuerySchema),
+  asyncHandler(getClients),
+);
 clientManagementRouter.delete(
   "/",
   validateRequest(deleteManagedClientsSchema),

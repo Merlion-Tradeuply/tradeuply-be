@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { env } from "../config/env.js";
 import { createVerificationOtpEmail } from "../templates/verification-otp.email.js";
 import { createDepositSubmittedEmails } from "../templates/deposit-submitted.email.js";
+import { createWithdrawalReviewedEmail, createWithdrawalSubmittedEmails } from "../templates/withdrawal.email.js";
 import { AppError } from "../utils/app-error.js";
 
 let resendClient;
@@ -82,4 +83,28 @@ export async function sendDepositSubmittedEmails({ client: account, deposit }) {
       });
     }
   });
+}
+
+async function sendMessages(messages, label) {
+  const client = getResendClient();
+  const results = await Promise.allSettled(messages.map(({ content, to }) =>
+    client.emails.send({ from: env.resendFromEmail, html: content.html, subject: content.subject, text: content.text, to: [to] }),
+  ));
+  results.forEach((result, index) => {
+    if (result.status === "rejected" || result.value.error) {
+      console.error(`${label} email could not be delivered.`, { recipient: messages[index].to, reason: result.status === "rejected" ? result.reason?.message : result.value.error?.message });
+    }
+  });
+}
+
+export async function sendWithdrawalSubmittedEmails({ client, withdrawal }) {
+  const content = createWithdrawalSubmittedEmails({ client, withdrawal });
+  await sendMessages([
+    { content: content.client, to: client.email },
+    { content: content.admin, to: env.depositNotificationEmail },
+  ], "Withdrawal notification");
+}
+
+export async function sendWithdrawalReviewedEmail({ client, withdrawal }) {
+  await sendMessages([{ content: createWithdrawalReviewedEmail({ client, withdrawal }), to: client.email }], "Withdrawal review notification");
 }

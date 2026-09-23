@@ -74,19 +74,23 @@ async function getSearchFilter(query) {
   return { $or: searchOptions };
 }
 
-export async function listTransactions({ direction, q, type } = {}) {
+export async function listTransactions({ direction, limit = 10, page = 1, q, type } = {}) {
   const filter = { deletedAt: null };
+  const skip = (page - 1) * limit;
 
   if (direction) filter.direction = direction;
   if (type) filter.type = type;
   const searchFilter = await getSearchFilter(q);
   if (searchFilter) Object.assign(filter, searchFilter);
 
-  const [transactions, summaryResult, depositedVolumes] = await Promise.all([
+  const [transactions, filteredTotal, summaryResult, depositedVolumes] = await Promise.all([
     BalanceTransaction.find(filter)
-    .populate("client", "firstName lastName email")
-    .populate("deposit", "methodName network status transactionHash")
-      .sort({ createdAt: -1 }),
+      .populate("client", "firstName lastName email")
+      .populate("deposit", "methodName network status transactionHash")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    BalanceTransaction.countDocuments(filter),
     BalanceTransaction.aggregate([
       { $match: { deletedAt: null } },
       {
@@ -99,7 +103,7 @@ export async function listTransactions({ direction, q, type } = {}) {
       },
     ]),
     BalanceTransaction.aggregate([
-      { $match: { $and: [filter, { type: "deposit" }] } },
+      { $match: { deletedAt: null, type: "deposit" } },
       { $group: { _id: "$currency", total: { $sum: "$amount" } } },
       { $sort: { _id: 1 } },
     ]),
@@ -107,6 +111,12 @@ export async function listTransactions({ direction, q, type } = {}) {
   const totals = summaryResult[0];
 
   return {
+    pagination: {
+      limit,
+      page,
+      pages: Math.max(1, Math.ceil(filteredTotal / limit)),
+      total: filteredTotal,
+    },
     summary: {
       all: totals?.all ?? 0,
       credit: totals?.credit ?? 0,

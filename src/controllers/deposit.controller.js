@@ -26,7 +26,7 @@ async function requireClient(clientId) {
 
 export async function createClientDeposit(request, response) {
   const client = await requireClient(request.clientAuth.sub);
-  const deposit = await submitDeposit(client, request.validatedBody, request, request.file);
+  const deposit = await submitDeposit(client, request.validatedBody, request);
   response.status(201).json({
     data: { deposit },
     message: "Your deposit was submitted for verification.",
@@ -53,8 +53,8 @@ export async function clientBalance(request, response) {
 }
 
 export async function getDeposits(request, response) {
-  const deposits = await listAdminDeposits(request.query.status);
-  response.status(200).json({ data: { deposits }, success: true });
+  const result = await listAdminDeposits(request.validatedQuery);
+  response.status(200).json({ data: result, success: true });
 }
 
 export async function getDepositDetails(request, response) {

@@ -45,8 +45,16 @@ function escapeRegularExpression(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export async function getAdminPaymentMethods({ category, q, sort, status } = {}) {
+export async function getAdminPaymentMethods({
+  category,
+  limit = 10,
+  page = 1,
+  q,
+  sort,
+  status,
+} = {}) {
   const filter = { deletedAt: null };
+  const skip = (page - 1) * limit;
 
   if (category) filter.category = category;
   if (status) filter.status = status;
@@ -62,12 +70,16 @@ export async function getAdminPaymentMethods({ category, q, sort, status } = {})
     "name-asc": { name: 1 },
     "name-desc": { name: -1 },
   };
-  const [methods, statusCounts] = await Promise.all([
-    PaymentMethod.find(filter).sort(sortOptions[sort] ?? sortOptions["display-order"]),
+  const [methods, statusCounts, total] = await Promise.all([
+    PaymentMethod.find(filter)
+      .sort(sortOptions[sort] ?? sortOptions["display-order"])
+      .skip(skip)
+      .limit(limit),
     PaymentMethod.aggregate([
       { $match: { deletedAt: null } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
+    PaymentMethod.countDocuments(filter),
   ]);
   const summary = { active: 0, all: 0, coming_soon: 0, disabled: 0 };
 
@@ -78,6 +90,12 @@ export async function getAdminPaymentMethods({ category, q, sort, status } = {})
 
   return {
     methods: methods.map((method) => serializeMethod(method, true)),
+    pagination: {
+      limit,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      total,
+    },
     summary,
   };
 }

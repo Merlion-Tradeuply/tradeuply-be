@@ -8,13 +8,12 @@ import {
   currentClient,
 } from "../controllers/client.controller.js";
 import { authenticateClient } from "../middleware/client-authentication.js";
-import { uploadSingleFile } from "../middleware/upload.js";
 import {
   clientLoginRateLimiter,
   clientRefreshRateLimiter,
   clientRegistrationRateLimiter,
 } from "../middleware/rate-limiters.js";
-import { validateJsonField, validateRequest } from "../middleware/validate-request.js";
+import { validateQuery, validateRequest } from "../middleware/validate-request.js";
 import {
   clientLoginSchema,
   clientRefreshTokenSchema,
@@ -34,22 +33,27 @@ import {
   getClientInvestmentDetails,
   getClientInvestments,
   returnClientInvestmentCapital,
+  withdrawClientInvestmentProfit,
 } from "../controllers/client-investment.controller.js";
 import { createDepositSchema } from "../validators/deposit.validator.js";
-import { createClientInvestmentSchema } from "../validators/client-investment.validator.js";
 import {
-  completeClientPaymentMethodQrUploadSchema,
+  createClientInvestmentSchema,
+  withdrawClientInvestmentProfitSchema,
+} from "../validators/client-investment.validator.js";
+import {
   createClientPaymentMethodSchema,
   updateClientPaymentMethodSchema,
 } from "../validators/client-payment-method.validator.js";
 import {
   addClientWalletPaymentMethod,
-  completeClientWalletQrUpload,
   editClientWalletPaymentMethod,
   getClientWalletPaymentMethods,
-  getClientWalletQrUploadSignature,
   removeClientWalletPaymentMethod,
 } from "../controllers/client-payment-method.controller.js";
+import { getClientTransactions } from "../controllers/client-transaction.controller.js";
+import { clientTransactionQuerySchema } from "../validators/client-transaction.validator.js";
+import { clientWithdrawals, createClientWithdrawal } from "../controllers/withdrawal.controller.js";
+import { createWithdrawalSchema } from "../validators/withdrawal.validator.js";
 
 export const clientRouter = Router();
 
@@ -80,9 +84,26 @@ clientRouter.get("/me", authenticateClient, asyncHandler(currentClient));
 clientRouter.get("/payment-methods", authenticateClient, asyncHandler(clientPaymentMethods));
 clientRouter.get("/balance", authenticateClient, asyncHandler(clientBalance));
 clientRouter.get(
+  "/transactions",
+  authenticateClient,
+  validateQuery(clientTransactionQuerySchema),
+  asyncHandler(getClientTransactions),
+);
+clientRouter.get(
   "/wallets",
   authenticateClient,
   asyncHandler(getClientWalletPaymentMethods),
+);
+clientRouter.get(
+  "/withdrawals",
+  authenticateClient,
+  asyncHandler(clientWithdrawals),
+);
+clientRouter.post(
+  "/withdrawals",
+  authenticateClient,
+  validateRequest(createWithdrawalSchema),
+  asyncHandler(createClientWithdrawal),
 );
 clientRouter.post(
   "/wallets",
@@ -100,17 +121,6 @@ clientRouter.delete(
   "/wallets/:methodId",
   authenticateClient,
   asyncHandler(removeClientWalletPaymentMethod),
-);
-clientRouter.post(
-  "/wallets/:methodId/qr-code/signature",
-  authenticateClient,
-  asyncHandler(getClientWalletQrUploadSignature),
-);
-clientRouter.post(
-  "/wallets/:methodId/qr-code/complete",
-  authenticateClient,
-  validateRequest(completeClientPaymentMethodQrUploadSchema),
-  asyncHandler(completeClientWalletQrUpload),
 );
 clientRouter.get(
   "/investments",
@@ -133,12 +143,17 @@ clientRouter.post(
   authenticateClient,
   asyncHandler(returnClientInvestmentCapital),
 );
+clientRouter.post(
+  "/investments/:investmentId/profit-withdrawal",
+  authenticateClient,
+  validateRequest(withdrawClientInvestmentProfitSchema),
+  asyncHandler(withdrawClientInvestmentProfit),
+);
 clientRouter.get("/deposits", authenticateClient, asyncHandler(clientDeposits));
 clientRouter.post(
   "/deposits",
   authenticateClient,
-  uploadSingleFile("paymentProof"),
-  validateJsonField("payload", createDepositSchema),
+  validateRequest(createDepositSchema),
   asyncHandler(createClientDeposit),
 );
 clientRouter.get(

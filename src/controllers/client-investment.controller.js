@@ -3,6 +3,7 @@ import {
   getClientInvestment,
   listClientInvestments,
   transferInvestmentCapital,
+  withdrawInvestmentProfit,
 } from "../services/client-investment.service.js";
 
 export async function addClientInvestment(request, response) {
@@ -13,6 +14,19 @@ export async function addClientInvestment(request, response) {
   response.status(201).json({
     data: { investment },
     message: "Your investment was created successfully.",
+    success: true,
+  });
+}
+
+export async function withdrawClientInvestmentProfit(request, response) {
+  const result = await withdrawInvestmentProfit(
+    request.clientAuth.sub,
+    request.params.investmentId,
+    request.validatedBody,
+  );
+  response.status(200).json({
+    data: result,
+    message: `Your profit was credited to your ${result.withdrawal.currency} wallet.`,
     success: true,
   });
 }

@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+export const adminDepositQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    page: z.coerce.number().int().min(1).default(1),
+    q: z.string().trim().max(100).default(""),
+    status: z
+      .enum(["all", "pending", "approved", "rejected"])
+      .default("all"),
+  })
+  .strict();
+
 export const createDepositSchema = z.object({
   amount: z.number().finite().positive().max(100000000),
   notes: z.string().trim().max(1000).optional().default(""),

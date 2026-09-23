@@ -11,6 +11,17 @@ const investmentObjectives = [
   "Capital growth",
 ];
 
+export const managedClientQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    page: z.coerce.number().int().min(1).default(1),
+    query: z.string().trim().max(100).default(""),
+    status: z
+      .enum(["all", "pending_verification", "active", "suspended"])
+      .default("all"),
+  })
+  .strict();
+
 export const updateManagedClientSchema = z
   .object({
     experience: z.enum(investmentExperiences).optional(),

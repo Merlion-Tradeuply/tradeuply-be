@@ -3,8 +3,19 @@ import { z } from "zod";
 export const transactionQuerySchema = z
   .object({
     direction: z.enum(["credit", "debit"]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    page: z.coerce.number().int().min(1).default(1),
     q: z.string().trim().max(100).optional(),
-    type: z.enum(["deposit", "withdrawal", "adjustment", "investment"]).optional(),
+    type: z
+      .enum([
+        "deposit",
+        "withdrawal",
+        "adjustment",
+        "investment",
+        "capital_return",
+        "profit_withdrawal",
+      ])
+      .optional(),
   })
   .strict();
 

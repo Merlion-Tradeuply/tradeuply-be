@@ -6,11 +6,8 @@ import {
 } from "../services/client-management.service.js";
 
 export async function getClients(request, response) {
-  const clients = await listManagedClients({
-    query: request.query.query,
-    status: request.query.status,
-  });
-  response.status(200).json({ data: { clients }, success: true });
+  const result = await listManagedClients(request.validatedQuery);
+  response.status(200).json({ data: result, success: true });
 }
 
 export async function getClientDetails(request, response) {

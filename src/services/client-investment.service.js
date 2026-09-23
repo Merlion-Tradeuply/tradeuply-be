@@ -114,6 +114,19 @@ function serializeProfit(profit) {
   };
 }
 
+function serializeProfitWithdrawal(transaction) {
+  return {
+    amount: transaction.amount.toString(),
+    amountUsd: transaction.amountUsd.toString(),
+    currency: transaction.currency,
+    exchangeRate: transaction.exchangeRate.toString(),
+    id: transaction.id,
+    quoteExpiresAt: transaction.quoteExpiresAt,
+    rateQuotedAt: transaction.rateQuotedAt,
+    rateSource: transaction.rateSource,
+  };
+}
+
 function serializeInvestment(investment, profits = [], includeHistory = false) {
   const now = new Date();
   const accruedDays = getCompletedProfitDays(investment, now);
@@ -403,4 +416,126 @@ export async function transferInvestmentCapital(clientId, investmentId) {
 
   const profits = await syncInvestmentLifecycle(investment);
   return serializeInvestment(investment, profits, true);
+}
+
+export async function withdrawInvestmentProfit(clientId, investmentId, payload) {
+  let investment = await findOwnedInvestment(clientId, investmentId);
+  await syncInvestmentLifecycle(investment);
+
+  const existingTransaction = await BalanceTransaction.findOne({
+    client: clientId,
+    requestId: payload.requestId,
+    type: "profit_withdrawal",
+  });
+  if (existingTransaction) {
+    const profits = await syncInvestmentLifecycle(investment);
+    return {
+      investment: serializeInvestment(investment, profits, true),
+      withdrawal: serializeProfitWithdrawal(existingTransaction),
+    };
+  }
+
+  const availableProfits = await InvestmentProfit.find({
+    client: clientId,
+    investment: investmentId,
+    status: "available",
+  }).sort({ dayNumber: 1 });
+  if (availableProfits.length === 0) {
+    throw new AppError("There is no available profit to withdraw.", {
+      code: "INVESTMENT_PROFIT_NOT_AVAILABLE",
+      statusCode: 409,
+    });
+  }
+
+  const amountUsd = sumDecimals(
+    availableProfits.map((profit) => profit.amountUsd.toString()),
+  );
+  const quote = await convertCurrency(
+    "USD",
+    payload.walletCurrency,
+    Number(amountUsd),
+  );
+  const profitIds = availableProfits.map((profit) => profit._id);
+  const session = await mongoose.startSession();
+  let withdrawalTransaction;
+
+  try {
+    await session.withTransaction(async () => {
+      const repeatedTransaction = await BalanceTransaction.findOne({
+        client: clientId,
+        requestId: payload.requestId,
+        type: "profit_withdrawal",
+      }).session(session);
+      if (repeatedTransaction) {
+        withdrawalTransaction = repeatedTransaction;
+        return;
+      }
+
+      investment = await findOwnedInvestment(clientId, investmentId, session);
+      const balance = await Balance.findOne({
+        client: clientId,
+        currency: payload.walletCurrency,
+      }).session(session);
+
+      if (!balance || Number(balance.totalDeposited.toString()) <= 0) {
+        throw new AppError(
+          `Deposit with ${payload.walletCurrency} before using this wallet for profit withdrawals.`,
+          { code: "PROFIT_WITHDRAWAL_WALLET_NOT_AVAILABLE", statusCode: 409 },
+        );
+      }
+
+      const updatedProfits = await InvestmentProfit.updateMany(
+        { _id: { $in: profitIds }, client: clientId, status: "available" },
+        { $set: { status: "withdrawn", withdrawnAt: new Date() } },
+        { session },
+      );
+      if (updatedProfits.modifiedCount !== profitIds.length) {
+        throw new AppError("This profit was already withdrawn.", {
+          code: "INVESTMENT_PROFIT_ALREADY_WITHDRAWN",
+          statusCode: 409,
+        });
+      }
+
+      const balanceBefore = balance.availableBalance.toString();
+      const creditedAmount = Number(quote.convertedAmount).toFixed(decimalPrecision);
+      const balanceAfter = addDecimals(balanceBefore, creditedAmount);
+      const now = new Date();
+
+      balance.availableBalance = mongoose.Types.Decimal128.fromString(balanceAfter);
+      balance.lastTransactionAt = now;
+      await balance.save({ session });
+
+      [withdrawalTransaction] = await BalanceTransaction.create(
+        [
+          {
+            amount: mongoose.Types.Decimal128.fromString(creditedAmount),
+            amountUsd: mongoose.Types.Decimal128.fromString(amountUsd),
+            balance: balance._id,
+            balanceAfter: mongoose.Types.Decimal128.fromString(balanceAfter),
+            balanceBefore: mongoose.Types.Decimal128.fromString(balanceBefore),
+            client: clientId,
+            currency: payload.walletCurrency,
+            description: `Profit withdrawn from ${investment.planSnapshot.name}`,
+            direction: "credit",
+            exchangeRate: mongoose.Types.Decimal128.fromString(String(quote.rate)),
+            investmentProfits: profitIds,
+            quoteExpiresAt: new Date(quote.quoteExpiresAt),
+            rateQuotedAt: new Date(quote.lastUpdated),
+            rateSource: quote.source,
+            requestId: payload.requestId,
+            type: "profit_withdrawal",
+          },
+        ],
+        { session },
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  const profits = await syncInvestmentLifecycle(investment);
+  return {
+    investment: serializeInvestment(investment, profits, true),
+    withdrawal: serializeProfitWithdrawal(withdrawalTransaction),
+  };
 }

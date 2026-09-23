@@ -37,6 +37,8 @@ export const updateInvestmentPlanSchema = createInvestmentPlanSchema
 export const investmentPlanQuerySchema = z
   .object({
     featured: z.enum(["true", "false"]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    page: z.coerce.number().int().min(1).default(1),
     q: z.string().trim().max(100).optional(),
     risk: z.string().trim().max(40).optional(),
     sort: z

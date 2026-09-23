@@ -1,7 +1,5 @@
 import {
-  completeClientPaymentMethodQrUpload,
   createClientPaymentMethod,
-  createClientPaymentMethodQrSignature,
   deleteClientPaymentMethod,
   listClientPaymentMethods,
   updateClientPaymentMethod,
@@ -45,27 +43,6 @@ export async function removeClientWalletPaymentMethod(request, response) {
   response.status(200).json({
     data: result,
     message: "Your wallet payment method was deleted successfully.",
-    success: true,
-  });
-}
-
-export async function getClientWalletQrUploadSignature(request, response) {
-  const upload = await createClientPaymentMethodQrSignature(
-    request.clientAuth.sub,
-    request.params.methodId,
-  );
-  response.status(200).json({ data: { upload }, success: true });
-}
-
-export async function completeClientWalletQrUpload(request, response) {
-  const method = await completeClientPaymentMethodQrUpload(
-    request.clientAuth.sub,
-    request.params.methodId,
-    request.validatedBody,
-  );
-  response.status(200).json({
-    data: { method },
-    message: "Your wallet QR code was uploaded successfully.",
     success: true,
   });
 }

@@ -54,7 +54,7 @@ export function createDepositSubmittedEmails({ client, deposit }) {
         ].join(""),
         eyebrow: "Deposit review required",
         heading: "A new deposit is awaiting approval",
-        message: `${clientName} submitted a cryptocurrency deposit. Review its transaction ID and payment screenshot in the TradeUply administration panel.`,
+        message: `${clientName} submitted a cryptocurrency deposit. Review its transaction ID in the TradeUply administration panel.`,
       }),
       subject: `New ${deposit.asset} deposit awaiting approval`,
       text: `New deposit awaiting approval. Client: ${client.firstName} ${client.lastName} (${client.email}). Amount: ${amount}. Method: ${deposit.methodName}. Network: ${deposit.network}. Transaction ID: ${deposit.transactionHash}.`,
