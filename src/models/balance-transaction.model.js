@@ -40,6 +40,8 @@ const balanceTransactionSchema = new mongoose.Schema(
     quoteExpiresAt: { type: Date },
     rateQuotedAt: { type: Date },
     rateSource: { maxlength: 80, trim: true, type: String },
+    sourceAmount: { min: 0, type: mongoose.Schema.Types.Decimal128 },
+    sourceCurrency: { maxlength: 20, trim: true, type: String },
     requestId: { maxlength: 80, trim: true, type: String },
     type: {
       enum: [

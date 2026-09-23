@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   adminDepositQuerySchema,
   createDepositSchema,
+  depositConversionQuoteQuerySchema,
   reviewDepositSchema,
 } from "../src/validators/deposit.validator.js";
 import { currencyConversionQuerySchema } from "../src/validators/currency.validator.js";
@@ -62,6 +63,30 @@ describe("deposit validation", () => {
   it("requires a reason when a deposit is rejected", () => {
     const result = reviewDepositSchema.safeParse({ action: "reject", notes: "" });
     assert.equal(result.success, false);
+  });
+
+  it("accepts a UPI deposit submission", () => {
+    const result = createDepositSchema.safeParse({
+      amount: 10000,
+      notes: "UPI payment",
+      paymentMethodId: "507f1f77bcf86cd799439011",
+      senderWalletAddress: "client@upi",
+      transactionHash: "UTR123456789",
+    });
+    assert.equal(result.success, true);
+  });
+
+  it("validates a deposit conversion quote and crypto credit selection", () => {
+    const quote = depositConversionQuoteQuerySchema.safeParse({
+      paymentMethodId: "507f1f77bcf86cd799439011",
+    });
+    const approval = reviewDepositSchema.safeParse({
+      action: "approve",
+      creditPaymentMethodId: "507f1f77bcf86cd799439011",
+      notes: "UPI payment verified.",
+    });
+    assert.equal(quote.success, true);
+    assert.equal(approval.success, true);
   });
 
   it("validates currency conversion queries", () => {

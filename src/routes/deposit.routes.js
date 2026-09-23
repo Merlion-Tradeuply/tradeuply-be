@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   getDepositDetails,
+  getDepositConversionQuote,
   getDeposits,
   updateDepositReview,
 } from "../controllers/deposit.controller.js";
@@ -14,6 +15,7 @@ import {
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   adminDepositQuerySchema,
+  depositConversionQuoteQuerySchema,
   reviewDepositSchema,
 } from "../validators/deposit.validator.js";
 
@@ -27,6 +29,11 @@ depositRouter.get(
   asyncHandler(getDeposits),
 );
 depositRouter.get("/:depositId", asyncHandler(getDepositDetails));
+depositRouter.get(
+  "/:depositId/conversion-quote",
+  validateQuery(depositConversionQuoteQuerySchema),
+  asyncHandler(getDepositConversionQuote),
+);
 depositRouter.patch(
   "/:depositId/review",
   validateRequest(reviewDepositSchema),

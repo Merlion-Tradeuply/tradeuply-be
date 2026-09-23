@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { env } from "../config/env.js";
 import { createVerificationOtpEmail } from "../templates/verification-otp.email.js";
 import { createDepositSubmittedEmails } from "../templates/deposit-submitted.email.js";
+import { createDepositReviewedEmail } from "../templates/deposit-reviewed.email.js";
 import { createWithdrawalReviewedEmail, createWithdrawalSubmittedEmails } from "../templates/withdrawal.email.js";
 import { AppError } from "../utils/app-error.js";
 
@@ -83,6 +84,13 @@ export async function sendDepositSubmittedEmails({ client: account, deposit }) {
       });
     }
   });
+}
+
+export async function sendDepositReviewedEmail({ client, deposit }) {
+  await sendMessages(
+    [{ content: createDepositReviewedEmail({ client, deposit }), to: client.email }],
+    "Deposit review notification",
+  );
 }
 
 async function sendMessages(messages, label) {

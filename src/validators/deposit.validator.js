@@ -15,13 +15,18 @@ export const createDepositSchema = z.object({
   amount: z.number().finite().positive().max(100000000),
   notes: z.string().trim().max(1000).optional().default(""),
   paymentMethodId: z.string().trim().regex(/^[a-f\d]{24}$/i, "Invalid payment method."),
-  senderWalletAddress: z.string().trim().min(8).max(200),
-  transactionHash: z.string().trim().min(8).max(200),
+  senderWalletAddress: z.string().trim().min(3).max(200),
+  transactionHash: z.string().trim().min(6).max(200),
 });
 
 export const reviewDepositSchema = z
   .object({
     action: z.enum(["approve", "reject"]),
+    creditPaymentMethodId: z
+      .string()
+      .trim()
+      .regex(/^[a-f\d]{24}$/i, "Invalid cryptocurrency payment method.")
+      .optional(),
     notes: z.string().trim().max(1000).optional().default(""),
   })
   .superRefine((payload, context) => {
@@ -33,3 +38,12 @@ export const reviewDepositSchema = z
       });
     }
   });
+
+export const depositConversionQuoteQuerySchema = z
+  .object({
+    paymentMethodId: z
+      .string()
+      .trim()
+      .regex(/^[a-f\d]{24}$/i, "Invalid cryptocurrency payment method."),
+  })
+  .strict();

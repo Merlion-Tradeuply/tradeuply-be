@@ -35,6 +35,8 @@ function serializeTransaction(transaction) {
     description: transaction.description,
     direction: transaction.direction,
     id: transaction.id,
+    sourceAmount: transaction.sourceAmount?.toString() ?? null,
+    sourceCurrency: transaction.sourceCurrency ?? null,
     type: transaction.type,
   };
 }

@@ -3,6 +3,7 @@ import { AppError } from "../utils/app-error.js";
 import { getClientBalances } from "../services/balance.service.js";
 import {
   getAdminDeposit,
+  getAdminDepositConversionQuote,
   getClientDeposit,
   getClientLedger,
   listAdminDeposits,
@@ -60,6 +61,14 @@ export async function getDeposits(request, response) {
 export async function getDepositDetails(request, response) {
   const deposit = await getAdminDeposit(request.params.depositId);
   response.status(200).json({ data: { deposit }, success: true });
+}
+
+export async function getDepositConversionQuote(request, response) {
+  const conversion = await getAdminDepositConversionQuote(
+    request.params.depositId,
+    request.validatedQuery.paymentMethodId,
+  );
+  response.status(200).json({ data: { conversion }, success: true });
 }
 
 export async function updateDepositReview(request, response) {

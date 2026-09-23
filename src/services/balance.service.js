@@ -36,8 +36,8 @@ export async function getClientBalances(clientId) {
   return balances.map(serializeBalance);
 }
 
-export async function creditDepositBalance(deposit, session) {
-  const currency = deposit.asset.trim().toUpperCase();
+export async function creditDepositBalance(deposit, session, conversion = null) {
+  const currency = (conversion?.to.code ?? deposit.asset).trim().toUpperCase();
   let balance = await Balance.findOne({ client: deposit.client, currency }).session(session);
 
   if (!balance) {
@@ -50,7 +50,9 @@ export async function creditDepositBalance(deposit, session) {
   const balanceBefore = mongoose.Types.Decimal128.fromString(
     decimalToString(balance.availableBalance),
   );
-  const amount = mongoose.Types.Decimal128.fromString(deposit.amount.toString());
+  const amount = mongoose.Types.Decimal128.fromString(
+    String(conversion?.convertedAmount ?? deposit.amount.toString()),
+  );
   const balanceAfter = mongoose.Types.Decimal128.fromString(
     addDecimalStrings(balanceBefore.toString(), amount.toString()),
   );
@@ -73,8 +75,20 @@ export async function creditDepositBalance(deposit, session) {
         client: deposit.client,
         currency,
         deposit: deposit._id,
-        description: `Approved ${currency} deposit ${deposit.transactionHash}`,
+        description: conversion
+          ? `Converted ${deposit.amount.toString()} ${deposit.asset} UPI deposit to ${amount.toString()} ${currency}`
+          : `Approved ${currency} deposit ${deposit.transactionHash}`,
         direction: "credit",
+        exchangeRate: conversion
+          ? mongoose.Types.Decimal128.fromString(String(conversion.rate))
+          : undefined,
+        quoteExpiresAt: conversion?.quoteExpiresAt,
+        rateQuotedAt: conversion?.lastUpdated,
+        rateSource: conversion?.source,
+        sourceAmount: conversion
+          ? mongoose.Types.Decimal128.fromString(deposit.amount.toString())
+          : undefined,
+        sourceCurrency: conversion ? deposit.asset : undefined,
         type: "deposit",
       },
     ],

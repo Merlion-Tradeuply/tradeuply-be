@@ -6,8 +6,12 @@ import { DepositActivity } from "../models/deposit-activity.model.js";
 import { Deposit } from "../models/deposit.model.js";
 import { AppError } from "../utils/app-error.js";
 import { creditDepositBalance } from "./balance.service.js";
+import { convertCurrency } from "./currency.service.js";
 import { getActivePaymentMethod } from "./payment-method.service.js";
-import { sendDepositSubmittedEmails } from "./email.service.js";
+import {
+  sendDepositReviewedEmail,
+  sendDepositSubmittedEmails,
+} from "./email.service.js";
 
 function serializeActivity(activity) {
   return {
@@ -38,12 +42,19 @@ function serializeDeposit(deposit, activities = []) {
     asset: deposit.asset,
     client,
     clientNotes: deposit.clientNotes,
+    convertedAmount: deposit.convertedAmount?.toString() ?? null,
+    convertedAsset: deposit.convertedAsset ?? null,
     createdAt: deposit.createdAt,
     destinationWalletAddress: deposit.destinationWalletAddress,
     id: deposit.id,
     methodCode: deposit.methodCode,
     methodName: deposit.methodName,
     network: deposit.network,
+    paymentCategory: deposit.paymentCategory ?? "crypto",
+    exchangeRate: deposit.exchangeRate?.toString() ?? null,
+    quoteExpiresAt: deposit.quoteExpiresAt,
+    rateQuotedAt: deposit.rateQuotedAt,
+    rateSource: deposit.rateSource ?? null,
     reviewNotes: deposit.reviewNotes,
     reviewedAt: deposit.reviewedAt,
     senderWalletAddress: deposit.senderWalletAddress,
@@ -91,6 +102,7 @@ export async function submitDeposit(client, payload, request) {
       methodCode: method.code,
       methodName: method.name,
       network: method.network,
+      paymentCategory: method.category,
       paymentMethod: method._id,
       senderWalletAddress: payload.senderWalletAddress,
       transactionHash: payload.transactionHash,
@@ -241,6 +253,53 @@ export async function getAdminDeposit(depositId) {
   return serializeDeposit(deposit, activities);
 }
 
+async function getDepositConversion(deposit, paymentMethodId) {
+  if ((deposit.paymentCategory ?? "crypto") !== "wallet") {
+    throw new AppError("Only digital wallet deposits require conversion.", {
+      code: "DEPOSIT_CONVERSION_NOT_REQUIRED",
+      statusCode: 409,
+    });
+  }
+
+  const targetMethod = await getActivePaymentMethod(paymentMethodId);
+  if (targetMethod.category !== "crypto" || !targetMethod.asset) {
+    throw new AppError("Select an active cryptocurrency payment method.", {
+      code: "CRYPTO_PAYMENT_METHOD_REQUIRED",
+      statusCode: 422,
+    });
+  }
+
+  const conversion = await convertCurrency(
+    deposit.asset,
+    targetMethod.asset,
+    Number(deposit.amount.toString()),
+  );
+  return { conversion, targetMethod };
+}
+
+export async function getAdminDepositConversionQuote(depositId, paymentMethodId) {
+  const deposit = await Deposit.findOne({ _id: depositId, status: "pending" });
+  if (!deposit) {
+    throw new AppError("The pending deposit could not be found.", {
+      code: "DEPOSIT_NOT_FOUND",
+      statusCode: 404,
+    });
+  }
+  const { conversion, targetMethod } = await getDepositConversion(
+    deposit,
+    paymentMethodId,
+  );
+  return {
+    ...conversion,
+    paymentMethod: {
+      asset: targetMethod.asset,
+      id: targetMethod.id,
+      name: targetMethod.name,
+      network: targetMethod.network,
+    },
+  };
+}
+
 export async function reviewDeposit(depositId, payload, user, request) {
   const session = await mongoose.startSession();
   let result;
@@ -261,6 +320,29 @@ export async function reviewDeposit(depositId, payload, user, request) {
       }
 
       const nextStatus = payload.action === "approve" ? "approved" : "rejected";
+      let conversion = null;
+      if (nextStatus === "approved" && (deposit.paymentCategory ?? "crypto") === "wallet") {
+        if (!payload.creditPaymentMethodId) {
+          throw new AppError("Select the cryptocurrency wallet to credit.", {
+            code: "CREDIT_PAYMENT_METHOD_REQUIRED",
+            statusCode: 422,
+          });
+        }
+        ({ conversion } = await getDepositConversion(
+          deposit,
+          payload.creditPaymentMethodId,
+        ));
+        deposit.convertedAmount = mongoose.Types.Decimal128.fromString(
+          String(conversion.convertedAmount),
+        );
+        deposit.convertedAsset = conversion.to.code;
+        deposit.exchangeRate = mongoose.Types.Decimal128.fromString(
+          String(conversion.rate),
+        );
+        deposit.quoteExpiresAt = new Date(conversion.quoteExpiresAt);
+        deposit.rateQuotedAt = new Date(conversion.lastUpdated);
+        deposit.rateSource = conversion.source;
+      }
       deposit.status = nextStatus;
       deposit.reviewNotes = payload.notes;
       deposit.reviewedAt = new Date();
@@ -285,7 +367,7 @@ export async function reviewDeposit(depositId, payload, user, request) {
       );
 
       if (nextStatus === "approved") {
-        await creditDepositBalance(deposit, session);
+        await creditDepositBalance(deposit, session, conversion);
         await DepositActivity.create(
           [
             {
@@ -295,8 +377,13 @@ export async function reviewDeposit(depositId, payload, user, request) {
               deposit: deposit._id,
               event: "balance_credited",
               metadata: {
-                amount: deposit.amount.toString(),
-                currency: deposit.asset,
+                amount: String(conversion?.convertedAmount ?? deposit.amount.toString()),
+                currency: conversion?.to.code ?? deposit.asset,
+                ...(conversion && {
+                  exchangeRate: String(conversion.rate),
+                  sourceAmount: deposit.amount.toString(),
+                  sourceCurrency: deposit.asset,
+                }),
               },
               newStatus: "approved",
             },
@@ -309,6 +396,19 @@ export async function reviewDeposit(depositId, payload, user, request) {
     });
   } finally {
     await session.endSession();
+  }
+
+  const client = await Client.findById(result.client).lean();
+  if (client) {
+    await sendDepositReviewedEmail({
+      client,
+      deposit: serializeDeposit(result),
+    }).catch((error) => {
+      console.error("Deposit review notification could not be sent.", {
+        depositId: result.id,
+        message: error.message,
+      });
+    });
   }
 
   return serializeDeposit(result);

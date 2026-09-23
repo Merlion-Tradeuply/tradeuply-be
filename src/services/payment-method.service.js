@@ -34,7 +34,7 @@ function serializeMethod(method, includeAdminFields = false) {
 
 export async function getClientPaymentMethods() {
   const methods = await PaymentMethod.find({
-    category: "crypto",
+    category: { $in: ["crypto", "wallet"] },
     deletedAt: null,
     status: { $ne: "disabled" },
   }).sort({ displayOrder: 1 });
@@ -190,7 +190,7 @@ export async function getActivePaymentMethod(methodId) {
   }
 
   if (
-    method.category !== "crypto" ||
+    !["crypto", "wallet"].includes(method.category) ||
     !method.asset ||
     !method.walletAddress ||
     !method.network ||
@@ -205,7 +205,7 @@ export async function getActivePaymentMethod(methodId) {
   return method;
 }
 
-async function getCryptocurrencyPaymentMethod(methodId) {
+async function getQrPaymentMethod(methodId) {
   const method = await PaymentMethod.findOne({ _id: methodId, deletedAt: null });
 
   if (!method) {
@@ -215,9 +215,9 @@ async function getCryptocurrencyPaymentMethod(methodId) {
     });
   }
 
-  if (method.category !== "crypto") {
+  if (!["crypto", "wallet"].includes(method.category)) {
     throw new AppError(
-      "QR image upload is available only for cryptocurrency payment methods.",
+      "QR image upload is available only for cryptocurrency and digital wallet payment methods.",
       {
         code: "QR_UPLOAD_NOT_SUPPORTED",
         statusCode: 400,
@@ -229,7 +229,7 @@ async function getCryptocurrencyPaymentMethod(methodId) {
 }
 
 export async function createPaymentMethodQrUploadSignature(methodId) {
-  const method = await getCryptocurrencyPaymentMethod(methodId);
+  const method = await getQrPaymentMethod(methodId);
 
   return createSignedImageUpload({
     folder: buildUploadFolder("payment-methods", method.code, "qr-code"),
@@ -238,7 +238,7 @@ export async function createPaymentMethodQrUploadSignature(methodId) {
 }
 
 export async function completePaymentMethodQrUpload(methodId, uploadResponse) {
-  const method = await getCryptocurrencyPaymentMethod(methodId);
+  const method = await getQrPaymentMethod(methodId);
   const folder = buildUploadFolder("payment-methods", method.code, "qr-code");
   const asset = verifySignedImageUpload({
     ...uploadResponse,
@@ -253,7 +253,7 @@ export async function completePaymentMethodQrUpload(methodId, uploadResponse) {
 }
 
 export async function uploadPaymentMethodQrCode(methodId, file) {
-  const method = await getCryptocurrencyPaymentMethod(methodId);
+  const method = await getQrPaymentMethod(methodId);
 
   if (!file) {
     throw new AppError("Select a QR code image to upload.", {

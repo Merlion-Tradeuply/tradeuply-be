@@ -11,9 +11,17 @@ const depositSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
     },
     clientNotes: { default: "", maxlength: 1000, trim: true, type: String },
+    convertedAmount: { default: null, min: 0, type: mongoose.Schema.Types.Decimal128 },
+    convertedAsset: { default: null, maxlength: 20, trim: true, type: String },
     destinationWalletAddress: { maxlength: 200, required: true, trim: true, type: String },
     methodCode: { maxlength: 40, required: true, trim: true, type: String },
     methodName: { maxlength: 80, required: true, trim: true, type: String },
+    paymentCategory: {
+      default: "crypto",
+      enum: ["crypto", "wallet"],
+      required: true,
+      type: String,
+    },
     network: { maxlength: 40, required: true, trim: true, type: String },
     paymentMethod: {
       ref: "PaymentMethod",
@@ -23,6 +31,10 @@ const depositSchema = new mongoose.Schema(
     reviewNotes: { default: "", maxlength: 1000, trim: true, type: String },
     reviewedAt: { default: null, type: Date },
     reviewedBy: { default: null, ref: "User", type: mongoose.Schema.Types.ObjectId },
+    exchangeRate: { default: null, min: 0, type: mongoose.Schema.Types.Decimal128 },
+    quoteExpiresAt: { default: null, type: Date },
+    rateQuotedAt: { default: null, type: Date },
+    rateSource: { default: null, maxlength: 80, trim: true, type: String },
     senderWalletAddress: { maxlength: 200, required: true, trim: true, type: String },
     status: {
       default: "pending",

@@ -12,7 +12,13 @@ function transactionRoute(transaction) {
   const planName = transaction.investment?.planSnapshot?.name;
 
   if (transaction.type === "deposit") {
-    return { destination: currencyWallet, source: "External crypto wallet" };
+    return {
+      destination: currencyWallet,
+      source:
+        transaction.deposit?.paymentCategory === "wallet"
+          ? `${transaction.sourceCurrency ?? transaction.deposit.asset} UPI payment`
+          : "External crypto wallet",
+    };
   }
   if (transaction.type === "investment") {
     return {
@@ -57,6 +63,8 @@ function serializeClientTransaction(transaction) {
       transaction.investment?.id ??
       transaction.id,
     source: route.source,
+    sourceAmount: transaction.sourceAmount?.toString() ?? null,
+    sourceCurrency: transaction.sourceCurrency ?? null,
     type: transaction.type,
   };
 }
@@ -96,7 +104,7 @@ export async function listClientTransactions(clientId, filters) {
   const skip = (filters.page - 1) * filters.limit;
   const [transactions, total, currencies, summary] = await Promise.all([
     BalanceTransaction.find(query)
-      .populate("deposit", "transactionHash")
+      .populate("deposit", "asset paymentCategory transactionHash")
       .populate("investment", "planSnapshot")
       .sort({ createdAt: filters.sort === "oldest" ? 1 : -1 })
       .skip(skip)
