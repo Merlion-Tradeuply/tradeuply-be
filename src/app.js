@@ -9,6 +9,7 @@ import { ensureDatabaseConnection } from "./middleware/database-connection.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { apiRouter } from "./routes/index.js";
+import { contactRouter } from "./routes/contact.routes.js";
 
 export const app = express();
 
@@ -42,6 +43,7 @@ app.get("/", (_request, response) => {
   });
 });
 
+app.use(`${env.apiPrefix}/contact`, contactRouter);
 app.use(env.apiPrefix, ensureDatabaseConnection, apiRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);

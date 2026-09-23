@@ -59,3 +59,9 @@ export const passwordResetCompletionRateLimiter = createClientRateLimiter({
   message: "Too many password reset attempts. Please try again later.",
   windowMs: 15 * 60 * 1000,
 });
+
+export const contactSubmissionRateLimiter = createClientRateLimiter({
+  limit: 5,
+  message: "Too many contact enquiries. Please try again later.",
+  windowMs: 15 * 60 * 1000,
+});

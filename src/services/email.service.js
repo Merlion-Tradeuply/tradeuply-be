@@ -7,6 +7,7 @@ import { createDepositReviewedEmail } from "../templates/deposit-reviewed.email.
 import { createWithdrawalReviewedEmail, createWithdrawalSubmittedEmails } from "../templates/withdrawal.email.js";
 import { createInvestmentBonusEmail } from "../templates/investment-bonus.email.js";
 import { createPasswordResetEmails } from "../templates/password-reset.email.js";
+import { createContactEnquiryEmail } from "../templates/contact-enquiry.email.js";
 import { AppError } from "../utils/app-error.js";
 
 let resendClient;
@@ -111,6 +112,30 @@ export async function sendPasswordResetEmails({ client, resetAt }) {
     ],
     "Password reset notification",
   );
+}
+
+export async function sendContactEnquiryEmail(enquiry) {
+  const client = getResendClient();
+  const content = createContactEnquiryEmail(enquiry);
+  const { error } = await client.emails.send({
+    from: env.resendFromEmail,
+    html: content.html,
+    replyTo: enquiry.email,
+    subject: content.subject,
+    text: content.text,
+    to: [env.contactNotificationEmail],
+  });
+
+  if (error) {
+    console.error("Contact enquiry email could not be delivered.", {
+      name: error.name,
+      statusCode: error.statusCode,
+    });
+    throw new AppError("Your enquiry could not be sent. Please try again.", {
+      code: "CONTACT_EMAIL_DELIVERY_FAILED",
+      statusCode: 502,
+    });
+  }
 }
 
 async function sendMessages(messages, label) {

@@ -33,6 +33,9 @@ export const env = Object.freeze({
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
+  contactNotificationEmail:
+    process.env.CONTACT_NOTIFICATION_EMAIL?.trim().toLowerCase() ??
+    "merlionasset@gmail.com",
   depositNotificationEmail:
     process.env.DEPOSIT_NOTIFICATION_EMAIL?.trim().toLowerCase() ??
     "merlionasset@gmail.com",
