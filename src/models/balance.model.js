@@ -10,7 +10,7 @@ const balanceSchema = new mongoose.Schema(
       required: true,
       type: mongoose.Schema.Types.ObjectId,
     },
-    currency: { default: "USDT", maxlength: 20, required: true, trim: true, type: String },
+    currency: { maxlength: 20, required: true, trim: true, type: String },
     lastTransactionAt: { default: null, type: Date },
     lockedBalance: moneyField,
     totalDeposited: moneyField,

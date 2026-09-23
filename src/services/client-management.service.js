@@ -2,15 +2,15 @@ import { Balance } from "../models/balance.model.js";
 import { Client } from "../models/client.model.js";
 import { RefreshSession } from "../models/refresh-session.model.js";
 import { AppError } from "../utils/app-error.js";
-import { getClientBalance } from "./balance.service.js";
+import { getClientBalances, serializeBalance } from "./balance.service.js";
 import {
   getClientLedger,
   listClientDeposits,
 } from "./deposit.service.js";
 
-function serializeClient(client, balance) {
+function serializeClient(client, balances = []) {
   return {
-    balance: balance?.availableBalance?.toString() ?? "0",
+    balances,
     createdAt: client.createdAt,
     email: client.email,
     emailVerifiedAt: client.emailVerifiedAt,
@@ -49,14 +49,18 @@ export async function listManagedClients({ query = "", status = "all" }) {
   const clients = await Client.find(filter).sort({ createdAt: -1 });
   const balances = await Balance.find({
     client: { $in: clients.map((client) => client._id) },
-    currency: "USDT",
-  });
-  const balancesByClient = new Map(
-    balances.map((balance) => [balance.client.toString(), balance]),
-  );
+  }).sort({ currency: 1 });
+  const balancesByClient = new Map();
+
+  for (const balance of balances) {
+    const clientId = balance.client.toString();
+    const clientBalances = balancesByClient.get(clientId) ?? [];
+    clientBalances.push(serializeBalance(balance));
+    balancesByClient.set(clientId, clientBalances);
+  }
 
   return clients.map((client) =>
-    serializeClient(client, balancesByClient.get(client.id)),
+    serializeClient(client, balancesByClient.get(client.id) ?? []),
   );
 }
 
@@ -70,15 +74,15 @@ export async function getManagedClient(clientId) {
     });
   }
 
-  const [balance, deposits, transactions] = await Promise.all([
-    getClientBalance(client._id),
+  const [balances, deposits, transactions] = await Promise.all([
+    getClientBalances(client._id),
     listClientDeposits(client._id),
     getClientLedger(client._id),
   ]);
 
   return {
-    balance,
-    client: serializeClient(client, { availableBalance: balance.availableBalance }),
+    balances,
+    client: serializeClient(client, balances),
     deposits,
     transactions,
   };
@@ -113,8 +117,8 @@ export async function updateManagedClient(clientId, payload) {
       );
     }
 
-    const balance = await Balance.findOne({ client: client._id, currency: "USDT" });
-    return serializeClient(client, balance);
+    const balances = await getClientBalances(client._id);
+    return serializeClient(client, balances);
   } catch (error) {
     if (error?.code === 11000) {
       throw new AppError("Another client already uses this phone number.", {

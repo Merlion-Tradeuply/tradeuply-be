@@ -1,6 +1,6 @@
 import { Client } from "../models/client.model.js";
 import { AppError } from "../utils/app-error.js";
-import { getClientBalance } from "../services/balance.service.js";
+import { getClientBalances } from "../services/balance.service.js";
 import {
   getAdminDeposit,
   getClientDeposit,
@@ -45,11 +45,11 @@ export async function clientDepositDetails(request, response) {
 }
 
 export async function clientBalance(request, response) {
-  const [balance, transactions] = await Promise.all([
-    getClientBalance(request.clientAuth.sub),
+  const [balances, transactions] = await Promise.all([
+    getClientBalances(request.clientAuth.sub),
     getClientLedger(request.clientAuth.sub),
   ]);
-  response.status(200).json({ data: { balance, transactions }, success: true });
+  response.status(200).json({ data: { balances, transactions }, success: true });
 }
 
 export async function getDeposits(request, response) {

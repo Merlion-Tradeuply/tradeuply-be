@@ -29,7 +29,12 @@ import {
   createClientDeposit,
 } from "../controllers/deposit.controller.js";
 import { clientPaymentMethods } from "../controllers/payment-method.controller.js";
+import {
+  addClientInvestment,
+  getClientInvestments,
+} from "../controllers/client-investment.controller.js";
 import { createDepositSchema } from "../validators/deposit.validator.js";
+import { createClientInvestmentSchema } from "../validators/client-investment.validator.js";
 
 export const clientRouter = Router();
 
@@ -59,6 +64,17 @@ clientRouter.post(
 clientRouter.get("/me", authenticateClient, asyncHandler(currentClient));
 clientRouter.get("/payment-methods", authenticateClient, asyncHandler(clientPaymentMethods));
 clientRouter.get("/balance", authenticateClient, asyncHandler(clientBalance));
+clientRouter.get(
+  "/investments",
+  authenticateClient,
+  asyncHandler(getClientInvestments),
+);
+clientRouter.post(
+  "/investments",
+  authenticateClient,
+  validateRequest(createClientInvestmentSchema),
+  asyncHandler(addClientInvestment),
+);
 clientRouter.get("/deposits", authenticateClient, asyncHandler(clientDeposits));
 clientRouter.post(
   "/deposits",

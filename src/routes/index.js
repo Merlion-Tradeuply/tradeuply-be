@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { clientRouter } from "./client.routes.js";
 import { clientManagementRouter } from "./client-management.routes.js";
+import { currencyRouter } from "./currency.routes.js";
 import { healthRouter } from "./health.routes.js";
 import { internalRouter } from "./internal.routes.js";
 import { investmentPlanRouter } from "./investment-plan.routes.js";
@@ -14,6 +15,7 @@ export const apiRouter = Router();
 
 apiRouter.use("/client", clientRouter);
 apiRouter.use("/clients", clientManagementRouter);
+apiRouter.use("/currency", currencyRouter);
 apiRouter.use("/dashboard", dashboardRouter);
 apiRouter.use("/deposits", depositRouter);
 apiRouter.use("/health", healthRouter);

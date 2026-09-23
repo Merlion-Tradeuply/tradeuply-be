@@ -23,7 +23,7 @@ function addDecimalStrings(left, right) {
 export function serializeBalance(balance) {
   return {
     availableBalance: decimalToString(balance?.availableBalance),
-    currency: balance?.currency ?? "USDT",
+    currency: balance.currency,
     lastTransactionAt: balance?.lastTransactionAt ?? null,
     lockedBalance: decimalToString(balance?.lockedBalance),
     totalDeposited: decimalToString(balance?.totalDeposited),
@@ -31,22 +31,18 @@ export function serializeBalance(balance) {
   };
 }
 
-export async function getClientBalance(clientId) {
-  const balance = await Balance.findOneAndUpdate(
-    { client: clientId, currency: "USDT" },
-    { $setOnInsert: { client: clientId, currency: "USDT" } },
-    { new: true, upsert: true },
-  );
-
-  return serializeBalance(balance);
+export async function getClientBalances(clientId) {
+  const balances = await Balance.find({ client: clientId }).sort({ currency: 1 });
+  return balances.map(serializeBalance);
 }
 
 export async function creditDepositBalance(deposit, session) {
-  let balance = await Balance.findOne({ client: deposit.client, currency: "USDT" }).session(session);
+  const currency = deposit.asset.trim().toUpperCase();
+  let balance = await Balance.findOne({ client: deposit.client, currency }).session(session);
 
   if (!balance) {
     [balance] = await Balance.create(
-      [{ client: deposit.client, currency: "USDT" }],
+      [{ client: deposit.client, currency }],
       { session },
     );
   }
@@ -75,9 +71,9 @@ export async function creditDepositBalance(deposit, session) {
         balanceAfter,
         balanceBefore,
         client: deposit.client,
-        currency: "USDT",
+        currency,
         deposit: deposit._id,
-        description: `Approved USDT deposit ${deposit.transactionHash}`,
+        description: `Approved ${currency} deposit ${deposit.transactionHash}`,
         direction: "credit",
         type: "deposit",
       },

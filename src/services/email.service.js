@@ -2,6 +2,7 @@ import { Resend } from "resend";
 
 import { env } from "../config/env.js";
 import { createVerificationOtpEmail } from "../templates/verification-otp.email.js";
+import { createDepositSubmittedEmails } from "../templates/deposit-submitted.email.js";
 import { AppError } from "../utils/app-error.js";
 
 let resendClient;
@@ -49,4 +50,36 @@ export async function sendVerificationOtpEmail({ email, firstName, otp }) {
   }
 
   return data?.id ?? null;
+}
+
+export async function sendDepositSubmittedEmails({ client: account, deposit }) {
+  const client = getResendClient();
+  const content = createDepositSubmittedEmails({ client: account, deposit });
+  const messages = [
+    { content: content.client, to: account.email },
+    { content: content.admin, to: env.depositNotificationEmail },
+  ];
+  const results = await Promise.allSettled(
+    messages.map(({ content: message, to }) =>
+      client.emails.send({
+        from: env.resendFromEmail,
+        html: message.html,
+        subject: message.subject,
+        text: message.text,
+        to: [to],
+      }),
+    ),
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected" || result.value.error) {
+      console.error("Deposit notification email could not be delivered.", {
+        recipient: messages[index].to,
+        reason:
+          result.status === "rejected"
+            ? result.reason?.message
+            : result.value.error?.message,
+      });
+    }
+  });
 }

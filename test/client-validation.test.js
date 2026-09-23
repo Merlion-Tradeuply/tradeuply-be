@@ -12,7 +12,7 @@ const validClientRegistration = {
   email: " Investor@Example.com ",
   experience: "New investor",
   firstName: "Demo",
-  investmentRange: "$100–$999",
+  investmentRange: "$500–$999",
   lastName: "Investor",
   objective: "Portfolio diversification",
   password: "SecurePass1",

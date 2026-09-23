@@ -19,19 +19,41 @@ const balanceTransactionSchema = new mongoose.Schema(
     currency: { maxlength: 20, required: true, trim: true, type: String },
     deposit: {
       ref: "Deposit",
-      sparse: true,
       type: mongoose.Schema.Types.ObjectId,
-      unique: true,
+    },
+    investment: {
+      ref: "ClientInvestment",
+      type: mongoose.Schema.Types.ObjectId,
     },
     description: { maxlength: 250, required: true, trim: true, type: String },
     deletedAt: { default: null, index: true, type: Date },
     direction: { enum: ["credit", "debit"], required: true, type: String },
-    type: { enum: ["deposit", "withdrawal", "adjustment"], required: true, type: String },
+    type: {
+      enum: ["deposit", "withdrawal", "adjustment", "investment"],
+      required: true,
+      type: String,
+    },
   },
   { timestamps: true, versionKey: false },
 );
 
 balanceTransactionSchema.index({ client: 1, createdAt: -1 });
+balanceTransactionSchema.index(
+  { deposit: 1 },
+  {
+    name: "deposit_unique_when_present",
+    partialFilterExpression: { deposit: { $type: "objectId" } },
+    unique: true,
+  },
+);
+balanceTransactionSchema.index(
+  { investment: 1 },
+  {
+    name: "investment_unique_when_present",
+    partialFilterExpression: { investment: { $type: "objectId" } },
+    unique: true,
+  },
+);
 
 export const BalanceTransaction =
   mongoose.models.BalanceTransaction ??

@@ -9,6 +9,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "lint": "eslint .",
+    "migrate:balance-transaction-indexes": "node src/seeders/balance-transaction-index.migration.js",
+    "migrate:multi-asset-wallets": "node src/seeders/multi-asset-wallet.migration.js",
     "seed:investment-plans": "node src/seeders/investment-plan.seeder.js",
     "seed:super-admin": "node src/seeders/super-admin.seeder.js",
     "test": "node --test"

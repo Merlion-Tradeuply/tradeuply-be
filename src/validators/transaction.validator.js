@@ -4,7 +4,7 @@ export const transactionQuerySchema = z
   .object({
     direction: z.enum(["credit", "debit"]).optional(),
     q: z.string().trim().max(100).optional(),
-    type: z.enum(["deposit", "withdrawal", "adjustment"]).optional(),
+    type: z.enum(["deposit", "withdrawal", "adjustment", "investment"]).optional(),
   })
   .strict();
 

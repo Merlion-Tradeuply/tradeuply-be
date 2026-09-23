@@ -5,6 +5,8 @@ import {
   createDepositSchema,
   reviewDepositSchema,
 } from "../src/validators/deposit.validator.js";
+import { currencyConversionQuerySchema } from "../src/validators/currency.validator.js";
+import { createClientInvestmentSchema } from "../src/validators/client-investment.validator.js";
 import {
   createInvestmentPlanSchema,
   deleteInvestmentPlansSchema,
@@ -22,7 +24,7 @@ import {
 } from "../src/validators/transaction.validator.js";
 
 describe("deposit validation", () => {
-  it("accepts a complete USDT deposit submission", () => {
+  it("accepts a complete cryptocurrency deposit submission", () => {
     const result = createDepositSchema.safeParse({
       amount: 125.5,
       notes: "TRC20 transfer",
@@ -39,7 +41,44 @@ describe("deposit validation", () => {
     assert.equal(result.success, false);
   });
 
-  it("allows a super-admin to configure the USDT wallet", () => {
+  it("validates currency conversion queries", () => {
+    const validResult = currencyConversionQuerySchema.safeParse({
+      amount: "250",
+      from: "usd",
+      to: "btc",
+    });
+    const invalidResult = currencyConversionQuerySchema.safeParse({
+      amount: 0,
+      from: "USD",
+      to: "BTC",
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(validResult.data?.from, "USD");
+    assert.equal(validResult.data?.to, "BTC");
+    assert.equal(invalidResult.success, false);
+  });
+
+  it("validates client investment creation", () => {
+    const validResult = createClientInvestmentSchema.safeParse({
+      amountUsd: 500,
+      planId: "507f1f77bcf86cd799439011",
+      requestId: "9fb0cfb9-70b4-4fc4-a705-00bf71fb738f",
+      walletCurrency: "btc",
+    });
+    const invalidResult = createClientInvestmentSchema.safeParse({
+      amountUsd: 0,
+      planId: "invalid",
+      requestId: "invalid",
+      walletCurrency: "BTC",
+    });
+
+    assert.equal(validResult.success, true);
+    assert.equal(validResult.data?.walletCurrency, "BTC");
+    assert.equal(invalidResult.success, false);
+  });
+
+  it("allows a super-admin to configure a cryptocurrency wallet", () => {
     const result = updatePaymentMethodSchema.safeParse({
       network: "TRC20",
       status: "active",

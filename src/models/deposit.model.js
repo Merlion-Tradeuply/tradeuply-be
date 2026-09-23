@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const depositSchema = new mongoose.Schema(
   {
     amount: { min: 0, required: true, type: mongoose.Schema.Types.Decimal128 },
+    asset: { maxlength: 20, required: true, trim: true, type: String },
     client: {
       index: true,
       ref: "Client",

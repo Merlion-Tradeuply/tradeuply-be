@@ -9,25 +9,6 @@ import {
   verifySignedImageUpload,
 } from "./upload.service.js";
 
-const defaultPaymentMethods = [
-  { category: "card", code: "debit-card", displayOrder: 10, name: "Debit Card" },
-  { category: "card", code: "credit-card", displayOrder: 20, name: "Credit Card" },
-  { category: "wallet", code: "google-pay", displayOrder: 30, name: "Google Pay" },
-  { category: "wallet", code: "apple-pay", displayOrder: 40, name: "Apple Pay" },
-  { category: "bank", code: "upi-qr", displayOrder: 50, name: "UPI QR Code" },
-  { asset: "BTC", category: "crypto", code: "bitcoin", displayOrder: 60, name: "Bitcoin" },
-  {
-    asset: "USDT",
-    category: "crypto",
-    code: "usdt",
-    displayOrder: 70,
-    instructions: "Send only USDT using the displayed network and keep your transaction hash.",
-    name: "USDT (Tether)",
-    network: "TRC20",
-    status: "active",
-  },
-];
-
 function serializeMethod(method, includeAdminFields = false) {
   const result = {
     asset: method.asset,
@@ -51,21 +32,9 @@ function serializeMethod(method, includeAdminFields = false) {
   return result;
 }
 
-export async function ensureDefaultPaymentMethods() {
-  await Promise.all(
-    defaultPaymentMethods.map((method) =>
-      PaymentMethod.updateOne(
-        { code: method.code },
-        { $setOnInsert: { status: "coming_soon", ...method } },
-        { upsert: true },
-      ),
-    ),
-  );
-}
-
 export async function getClientPaymentMethods() {
-  await ensureDefaultPaymentMethods();
   const methods = await PaymentMethod.find({
+    category: "crypto",
     deletedAt: null,
     status: { $ne: "disabled" },
   }).sort({ displayOrder: 1 });
@@ -77,7 +46,6 @@ function escapeRegularExpression(value) {
 }
 
 export async function getAdminPaymentMethods({ category, q, sort, status } = {}) {
-  await ensureDefaultPaymentMethods();
   const filter = { deletedAt: null };
 
   if (category) filter.category = category;
@@ -203,7 +171,13 @@ export async function getActivePaymentMethod(methodId) {
     });
   }
 
-  if (!method.walletAddress || !method.network || !method.qrCodeUrl) {
+  if (
+    method.category !== "crypto" ||
+    !method.asset ||
+    !method.walletAddress ||
+    !method.network ||
+    !method.qrCodeUrl
+  ) {
     throw new AppError("This payment method has not been fully configured.", {
       code: "PAYMENT_METHOD_NOT_CONFIGURED",
       statusCode: 409,

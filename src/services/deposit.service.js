@@ -6,6 +6,7 @@ import { Deposit } from "../models/deposit.model.js";
 import { AppError } from "../utils/app-error.js";
 import { creditDepositBalance } from "./balance.service.js";
 import { getActivePaymentMethod } from "./payment-method.service.js";
+import { sendDepositSubmittedEmails } from "./email.service.js";
 import {
   buildUploadFolder,
   deleteUploadedFile,
@@ -39,6 +40,7 @@ function serializeDeposit(deposit, activities = []) {
   return {
     activities: activities.map(serializeActivity),
     amount: deposit.amount.toString(),
+    asset: deposit.asset,
     client,
     clientNotes: deposit.clientNotes,
     createdAt: deposit.createdAt,
@@ -66,23 +68,17 @@ function requestContext(request) {
 
 export async function submitDeposit(client, payload, request, paymentProof) {
   const method = await getActivePaymentMethod(payload.paymentMethodId);
-
-  if (method.code !== "usdt") {
-    throw new AppError("Only USDT deposits are currently accepted.", {
-      code: "PAYMENT_METHOD_NOT_ACCEPTED",
-      statusCode: 400,
-    });
-  }
+  const asset = method.asset.trim().toUpperCase();
 
   if (method.minimumAmount !== null && payload.amount < method.minimumAmount) {
-    throw new AppError(`The minimum deposit is ${method.minimumAmount} USDT.`, {
+    throw new AppError(`The minimum deposit is ${method.minimumAmount} ${asset}.`, {
       code: "DEPOSIT_BELOW_MINIMUM",
       statusCode: 422,
     });
   }
 
   if (method.maximumAmount !== null && payload.amount > method.maximumAmount) {
-    throw new AppError(`The maximum deposit is ${method.maximumAmount} USDT.`, {
+    throw new AppError(`The maximum deposit is ${method.maximumAmount} ${asset}.`, {
       code: "DEPOSIT_ABOVE_MAXIMUM",
       statusCode: 422,
     });
@@ -114,6 +110,7 @@ export async function submitDeposit(client, payload, request, paymentProof) {
     const deposit = await Deposit.create({
       _id: depositId,
       amount: payload.amount.toFixed(8),
+      asset,
       client: client._id,
       clientNotes: payload.notes,
       destinationWalletAddress: method.walletAddress,
@@ -137,7 +134,18 @@ export async function submitDeposit(client, payload, request, paymentProof) {
       ...requestContext(request),
     });
 
-    return serializeDeposit(deposit, [activity]);
+    const serializedDeposit = serializeDeposit(deposit, [activity]);
+    await sendDepositSubmittedEmails({
+      client,
+      deposit: serializedDeposit,
+    }).catch((error) => {
+      console.error("Deposit notifications could not be sent.", {
+        depositId: deposit.id,
+        message: error.message,
+      });
+    });
+
+    return serializedDeposit;
   } catch (error) {
     await deleteUploadedFile(proofAsset.publicId).catch(() => undefined);
 
@@ -248,7 +256,10 @@ export async function reviewDeposit(depositId, payload, user, request) {
               actorType: "internal",
               deposit: deposit._id,
               event: "balance_credited",
-              metadata: { amount: deposit.amount.toString(), currency: "USDT" },
+              metadata: {
+                amount: deposit.amount.toString(),
+                currency: deposit.asset,
+              },
               newStatus: "approved",
             },
           ],
