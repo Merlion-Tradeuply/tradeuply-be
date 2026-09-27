@@ -44,6 +44,13 @@ describe("TradeUply API", () => {
     assert.equal(response.body.error.code, "ACCESS_TOKEN_REQUIRED");
   });
 
+  it("protects the consolidated client dashboard without an access token", async () => {
+    const response = await request(app).get("/api/v1/client/dashboard").expect(401);
+
+    assert.equal(response.body.success, false);
+    assert.equal(response.body.error.code, "ACCESS_TOKEN_REQUIRED");
+  });
+
   it("protects the dashboard module without an access token", async () => {
     const response = await request(app).get("/api/v1/dashboard").expect(401);
 
