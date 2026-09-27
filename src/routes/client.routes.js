@@ -63,6 +63,7 @@ import { getClientTransactions } from "../controllers/client-transaction.control
 import { clientTransactionQuerySchema } from "../validators/client-transaction.validator.js";
 import { clientWithdrawals, createClientWithdrawal } from "../controllers/withdrawal.controller.js";
 import { createWithdrawalSchema } from "../validators/withdrawal.validator.js";
+import { clientDashboard } from "../controllers/client-dashboard.controller.js";
 
 export const clientRouter = Router();
 
@@ -108,6 +109,11 @@ clientRouter.post(
   asyncHandler(clientLogout),
 );
 clientRouter.get("/me", authenticateClient, asyncHandler(currentClient));
+clientRouter.get(
+  "/dashboard",
+  authenticateClient,
+  asyncHandler(clientDashboard),
+);
 clientRouter.get("/payment-methods", authenticateClient, asyncHandler(clientPaymentMethods));
 clientRouter.get("/balance", authenticateClient, asyncHandler(clientBalance));
 clientRouter.get(
