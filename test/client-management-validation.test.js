@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   creditInvestmentBonusSchema,
+  creditWalletBonusSchema,
   deleteManagedClientsSchema,
   managedClientQuerySchema,
   updateManagedClientSchema,
@@ -57,5 +58,17 @@ describe("client management validation", () => {
 
     assert.equal(result.success, true);
     assert.equal(creditInvestmentBonusSchema.safeParse({ amountUsd: 0 }).success, false);
+  });
+
+  it("validates an administrator wallet bonus credit", () => {
+    const result = creditWalletBonusSchema.safeParse({
+      amountUsd: 15,
+      asset: "sol",
+      note: "Service recovery credit",
+      requestId: "wallet-bonus-123456",
+    });
+    assert.equal(result.success, true);
+    assert.equal(result.data.asset, "SOL");
+    assert.equal(creditWalletBonusSchema.safeParse({ amountUsd: 0 }).success, false);
   });
 });

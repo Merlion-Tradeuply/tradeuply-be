@@ -8,6 +8,7 @@ import { createWithdrawalReviewedEmail, createWithdrawalSubmittedEmails } from "
 import { createInvestmentBonusEmail } from "../templates/investment-bonus.email.js";
 import { createPasswordResetEmails } from "../templates/password-reset.email.js";
 import { createContactEnquiryEmail } from "../templates/contact-enquiry.email.js";
+import { createWalletBonusEmail } from "../templates/wallet-bonus.email.js";
 import { AppError } from "../utils/app-error.js";
 
 let resendClient;
@@ -160,4 +161,11 @@ export async function sendWithdrawalSubmittedEmails({ client, withdrawal }) {
 
 export async function sendWithdrawalReviewedEmail({ client, withdrawal }) {
   await sendMessages([{ content: createWithdrawalReviewedEmail({ client, withdrawal }), to: client.email }], "Withdrawal review notification");
+}
+
+export async function sendWalletBonusEmail({ bonus, client }) {
+  await sendMessages(
+    [{ content: createWalletBonusEmail({ bonus, client }), to: client.email }],
+    "Wallet bonus notification",
+  );
 }

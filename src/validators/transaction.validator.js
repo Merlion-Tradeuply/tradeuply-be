@@ -14,6 +14,7 @@ export const transactionQuerySchema = z
         "investment",
         "capital_return",
         "profit_withdrawal",
+        "bonus",
       ])
       .optional(),
   })

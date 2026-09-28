@@ -11,6 +11,7 @@ const balanceTransactionSchema = new mongoose.Schema(
     },
     balanceAfter: { min: 0, required: true, type: mongoose.Schema.Types.Decimal128 },
     balanceBefore: { min: 0, required: true, type: mongoose.Schema.Types.Decimal128 },
+    bonusSource: { enum: ["signup", "admin"], type: String },
     client: {
       index: true,
       ref: "Client",
@@ -18,6 +19,7 @@ const balanceTransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
     },
     currency: { maxlength: 20, required: true, trim: true, type: String },
+    createdBy: { ref: "User", type: mongoose.Schema.Types.ObjectId },
     deposit: {
       ref: "Deposit",
       type: mongoose.Schema.Types.ObjectId,
@@ -51,6 +53,7 @@ const balanceTransactionSchema = new mongoose.Schema(
         "investment",
         "capital_return",
         "profit_withdrawal",
+        "bonus",
       ],
       required: true,
       type: String,

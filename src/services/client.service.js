@@ -12,11 +12,13 @@ import { maskEmail } from "../utils/normalizers.js";
 import { hashToken } from "../utils/token-hash.js";
 import { getActiveOtpState, issueOtp, verifyOtp } from "./otp.service.js";
 import { sendPasswordResetEmails } from "./email.service.js";
+import { getSignupBonusOffer } from "./platform-setting.service.js";
 import {
   consumeRefreshToken,
   issueTokenPair,
   revokeRefreshToken,
 } from "./token.service.js";
+import { creditSignupBonus } from "./wallet-bonus.service.js";
 
 const emailVerificationPurpose = "email_verification";
 const passwordResetPurpose = "password_reset";
@@ -76,6 +78,13 @@ export async function loginClient({ email, password }, userAgent) {
 
   if (!passwordMatches) assertActiveClient(null);
   assertActiveClient(client);
+
+  await creditSignupBonus(client).catch((error) => {
+    console.error("Pending signup bonus could not be credited during login.", {
+      clientId: client.id,
+      message: error.message,
+    });
+  });
 
   return {
     client: getAuthenticatedClientResponse(client),
@@ -164,6 +173,7 @@ export async function createClientRegistration(payload) {
   }
 
   const now = new Date();
+  const signupBonusOffer = await getSignupBonusOffer();
   const passwordHash = await bcrypt.hash(
     payload.password,
     securityConfig.passwordHashRounds,
@@ -187,6 +197,7 @@ export async function createClientRegistration(payload) {
       lastName: payload.lastName,
       passwordHash,
       phone: payload.phone,
+      signupBonusOffer,
     });
   } catch (error) {
     if (error?.code === 11000) {
@@ -222,7 +233,7 @@ export async function activateVerifiedClient(email) {
         status: "active",
       },
     },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!client) {
@@ -232,13 +243,25 @@ export async function activateVerifiedClient(email) {
       status: "active",
     });
 
-    if (alreadyActiveClient) return getClientResponse(alreadyActiveClient);
+    if (alreadyActiveClient) {
+      await creditSignupBonus(alreadyActiveClient).catch((error) => {
+        console.error("Signup bonus retry failed.", { clientId: alreadyActiveClient.id, message: error.message });
+      });
+      return getClientResponse(alreadyActiveClient);
+    }
 
     throw new AppError("The pending client account could not be found.", {
       code: "PENDING_CLIENT_NOT_FOUND",
       statusCode: 404,
     });
   }
+
+  await creditSignupBonus(client).catch((error) => {
+    console.error("Signup bonus could not be credited after verification.", {
+      clientId: client.id,
+      message: error.message,
+    });
+  });
 
   return getClientResponse(client);
 }
