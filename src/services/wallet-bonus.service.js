@@ -103,7 +103,7 @@ export async function creditWalletBonus({
       const balanceAfter = decimal(fromUnits(beforeUnits + bonusUnits));
       const description = source === "signup"
         ? `Signup bonus converted from $${Number(amountUsd).toFixed(2)}`
-        : `Manual wallet bonus${note ? ` · ${note}` : ""}`;
+        : `Wallet bonus${note ? ` · ${note}` : ""}`;
 
       balance.availableBalance = balanceAfter;
       balance.lastTransactionAt = new Date();

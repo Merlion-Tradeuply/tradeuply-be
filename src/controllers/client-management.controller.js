@@ -36,7 +36,7 @@ export async function addClientWalletBonus(request, response) {
     ...request.validatedBody,
     clientId: request.params.clientId,
     createdBy: request.user._id,
-    source: "manual",
+    source: "admin",
   });
   response.status(result.credited ? 201 : 200).json({
     data: result,

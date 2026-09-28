@@ -11,7 +11,7 @@ const balanceTransactionSchema = new mongoose.Schema(
     },
     balanceAfter: { min: 0, required: true, type: mongoose.Schema.Types.Decimal128 },
     balanceBefore: { min: 0, required: true, type: mongoose.Schema.Types.Decimal128 },
-    bonusSource: { enum: ["signup", "manual"], type: String },
+    bonusSource: { enum: ["signup", "admin"], type: String },
     client: {
       index: true,
       ref: "Client",

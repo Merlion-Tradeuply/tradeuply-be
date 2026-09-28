@@ -60,7 +60,7 @@ describe("client management validation", () => {
     assert.equal(creditInvestmentBonusSchema.safeParse({ amountUsd: 0 }).success, false);
   });
 
-  it("validates a manual wallet bonus credit", () => {
+  it("validates an administrator wallet bonus credit", () => {
     const result = creditWalletBonusSchema.safeParse({
       amountUsd: 15,
       asset: "sol",

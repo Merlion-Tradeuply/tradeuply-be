@@ -3,6 +3,14 @@ import mongoose from "mongoose";
 import { BalanceTransaction } from "../models/balance-transaction.model.js";
 import { Deposit } from "../models/deposit.model.js";
 
+function publicDescription(transaction) {
+  if (transaction.type !== "bonus" || transaction.bonusSource === "signup") {
+    return transaction.description;
+  }
+  const noteIndex = transaction.description?.indexOf(" · ") ?? -1;
+  return noteIndex >= 0 ? `Wallet bonus${transaction.description.slice(noteIndex)}` : "Wallet bonus";
+}
+
 function escapeRegularExpression(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -58,7 +66,7 @@ function serializeClientTransaction(transaction) {
     balanceBefore: transaction.balanceBefore.toString(),
     createdAt: transaction.createdAt,
     currency: transaction.currency,
-    description: transaction.description,
+    description: publicDescription(transaction),
     destination: route.destination,
     direction: transaction.direction,
     exchangeRate: transaction.exchangeRate?.toString() ?? null,

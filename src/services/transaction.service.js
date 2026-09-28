@@ -5,6 +5,14 @@ import { Client } from "../models/client.model.js";
 import { Deposit } from "../models/deposit.model.js";
 import { AppError } from "../utils/app-error.js";
 
+function publicDescription(transaction) {
+  if (transaction.type !== "bonus" || transaction.bonusSource === "signup") {
+    return transaction.description;
+  }
+  const noteIndex = transaction.description?.indexOf(" · ") ?? -1;
+  return noteIndex >= 0 ? `Wallet bonus${transaction.description.slice(noteIndex)}` : "Wallet bonus";
+}
+
 function serializeTransaction(transaction) {
   const client = transaction.client?.email
     ? {
@@ -32,7 +40,7 @@ function serializeTransaction(transaction) {
     createdAt: transaction.createdAt,
     currency: transaction.currency,
     deposit,
-    description: transaction.description,
+    description: publicDescription(transaction),
     direction: transaction.direction,
     id: transaction.id,
     sourceAmount: transaction.sourceAmount?.toString() ?? null,
