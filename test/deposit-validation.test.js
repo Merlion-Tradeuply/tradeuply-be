@@ -51,6 +51,7 @@ describe("deposit validation", () => {
   it("accepts a complete cryptocurrency deposit submission", () => {
     const result = createDepositSchema.safeParse({
       amount: 125.5,
+      amountUsd: 100,
       notes: "TRC20 transfer",
       paymentMethodId: "507f1f77bcf86cd799439011",
       senderWalletAddress: "TSenderWalletAddress123",
@@ -68,6 +69,7 @@ describe("deposit validation", () => {
   it("accepts a UPI deposit submission", () => {
     const result = createDepositSchema.safeParse({
       amount: 10000,
+      amountUsd: 120,
       notes: "UPI payment",
       paymentMethodId: "507f1f77bcf86cd799439011",
       senderWalletAddress: "client@upi",

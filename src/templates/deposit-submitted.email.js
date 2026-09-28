@@ -38,7 +38,13 @@ export function createDepositSubmittedEmails({ client, deposit }) {
   const clientName = escapeHtml(`${client.firstName} ${client.lastName}`);
   const amount = `${deposit.amount} ${deposit.asset}`;
   const commonDetails = [
+    ...(deposit.requestedAmountUsd
+      ? [detail("Requested value", `$${Number(deposit.requestedAmountUsd).toFixed(2)} USD`)]
+      : []),
     detail("Amount", amount),
+    ...(deposit.paymentExchangeRate
+      ? [detail("USD conversion", `1 USD = ${deposit.paymentExchangeRate} ${deposit.asset}`)]
+      : []),
     detail("Payment method", deposit.methodName),
     detail("Network", deposit.network),
     detail("Transaction ID", deposit.transactionHash),
@@ -57,7 +63,7 @@ export function createDepositSubmittedEmails({ client, deposit }) {
         message: `${clientName} submitted a ${deposit.paymentCategory === "wallet" ? "UPI" : "cryptocurrency"} deposit. Review its transaction ID in the TradeUply administration panel.`,
       }),
       subject: `New ${deposit.asset} deposit awaiting approval`,
-      text: `New deposit awaiting approval. Client: ${client.firstName} ${client.lastName} (${client.email}). Amount: ${amount}. Method: ${deposit.methodName}. Network: ${deposit.network}. Transaction ID: ${deposit.transactionHash}.`,
+      text: `New deposit awaiting approval. Client: ${client.firstName} ${client.lastName} (${client.email}). Requested value: ${deposit.requestedAmountUsd ? `$${Number(deposit.requestedAmountUsd).toFixed(2)} USD. ` : ""}Payment amount: ${amount}. Method: ${deposit.methodName}. Network: ${deposit.network}. Transaction ID: ${deposit.transactionHash}.`,
     },
     client: {
       html: emailShell({
@@ -67,7 +73,7 @@ export function createDepositSubmittedEmails({ client, deposit }) {
         message: `Hello ${escapeHtml(client.firstName)}, your deposit is pending administrator verification.${deposit.paymentCategory === "wallet" ? " After approval, the administrator will convert it and credit the selected cryptocurrency wallet." : ` Your ${escapeHtml(deposit.asset)} wallet balance will update after approval.`}`,
       }),
       subject: `Your ${deposit.asset} deposit is pending verification`,
-      text: `Hello ${client.firstName}, we received your ${amount} deposit request. Transaction ID: ${deposit.transactionHash}. It is pending administrator verification and your wallet will update after approval.`,
+      text: `Hello ${client.firstName}, we received your ${deposit.requestedAmountUsd ? `$${Number(deposit.requestedAmountUsd).toFixed(2)} USD deposit paid as ` : ""}${amount}. Transaction ID: ${deposit.transactionHash}. It is pending administrator verification and your wallet will update after approval.`,
     },
   };
 }

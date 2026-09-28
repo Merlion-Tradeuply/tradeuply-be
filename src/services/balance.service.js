@@ -69,6 +69,7 @@ export async function creditDepositBalance(deposit, session, conversion = null) 
     [
       {
         amount,
+        amountUsd: deposit.requestedAmountUsd,
         balance: balance._id,
         balanceAfter,
         balanceBefore,
@@ -76,19 +77,19 @@ export async function creditDepositBalance(deposit, session, conversion = null) 
         currency,
         deposit: deposit._id,
         description: conversion
-          ? `Converted ${deposit.amount.toString()} ${deposit.asset} UPI deposit to ${amount.toString()} ${currency}`
-          : `Approved ${currency} deposit ${deposit.transactionHash}`,
+          ? `Approved $${deposit.requestedAmountUsd?.toString() ?? "0"} USD deposit paid as ${deposit.amount.toString()} ${deposit.asset} and converted to ${amount.toString()} ${currency}`
+          : `Approved $${deposit.requestedAmountUsd?.toString() ?? "0"} USD deposit paid as ${amount.toString()} ${currency}`,
         direction: "credit",
         exchangeRate: conversion
           ? mongoose.Types.Decimal128.fromString(String(conversion.rate))
-          : undefined,
-        quoteExpiresAt: conversion?.quoteExpiresAt,
-        rateQuotedAt: conversion?.lastUpdated,
-        rateSource: conversion?.source,
+          : deposit.paymentExchangeRate,
+        quoteExpiresAt: conversion?.quoteExpiresAt ?? deposit.paymentQuoteExpiresAt,
+        rateQuotedAt: conversion?.lastUpdated ?? deposit.paymentRateQuotedAt,
+        rateSource: conversion?.source ?? deposit.paymentRateSource,
         sourceAmount: conversion
           ? mongoose.Types.Decimal128.fromString(deposit.amount.toString())
-          : undefined,
-        sourceCurrency: conversion ? deposit.asset : undefined,
+          : deposit.requestedAmountUsd,
+        sourceCurrency: conversion ? deposit.asset : "USD",
         type: "deposit",
       },
     ],
