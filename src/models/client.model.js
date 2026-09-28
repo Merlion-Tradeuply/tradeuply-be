@@ -42,6 +42,12 @@ const clientSchema = new mongoose.Schema(
       unique: true,
     },
     role: { default: "client", enum: ["client"], type: String },
+    signupBonusCreditedAt: { default: null, type: Date },
+    signupBonusOffer: {
+      amountUsd: { min: 0, type: mongoose.Schema.Types.Decimal128 },
+      asset: { maxlength: 20, trim: true, type: String, uppercase: true },
+      configuredAt: { type: Date },
+    },
     status: {
       default: "pending_verification",
       enum: ["pending_verification", "active", "suspended"],

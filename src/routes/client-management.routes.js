@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   addClientInvestmentBonus,
+  addClientWalletBonus,
   editClient,
   getClientDetails,
   getClients,
@@ -16,6 +17,7 @@ import {
 import { asyncHandler } from "../utils/async-handler.js";
 import {
   creditInvestmentBonusSchema,
+  creditWalletBonusSchema,
   deleteManagedClientsSchema,
   managedClientQuerySchema,
   updateManagedClientSchema,
@@ -36,6 +38,11 @@ clientManagementRouter.delete(
   asyncHandler(removeClients),
 );
 clientManagementRouter.get("/:clientId", asyncHandler(getClientDetails));
+clientManagementRouter.post(
+  "/:clientId/wallet-bonus",
+  validateRequest(creditWalletBonusSchema),
+  asyncHandler(addClientWalletBonus),
+);
 clientManagementRouter.post(
   "/:clientId/investments/:investmentId/bonus",
   validateRequest(creditInvestmentBonusSchema),

@@ -57,3 +57,12 @@ export const creditInvestmentBonusSchema = z
     note: z.string().trim().max(300).optional().default(""),
   })
   .strict();
+
+export const creditWalletBonusSchema = z
+  .object({
+    amountUsd: z.number().finite().min(0.01).max(1_000_000),
+    asset: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,20}$/),
+    note: z.string().trim().max(250).optional().default(""),
+    requestId: z.string().trim().min(8).max(80),
+  })
+  .strict();

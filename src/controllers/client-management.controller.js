@@ -5,6 +5,7 @@ import {
   updateManagedClient,
 } from "../services/client-management.service.js";
 import { creditInvestmentBonus } from "../services/client-investment.service.js";
+import { creditWalletBonus } from "../services/wallet-bonus.service.js";
 
 export async function getClients(request, response) {
   const result = await listManagedClients(request.validatedQuery);
@@ -26,6 +27,22 @@ export async function addClientInvestmentBonus(request, response) {
   response.status(201).json({
     data: result,
     message: "The investment bonus was credited successfully.",
+    success: true,
+  });
+}
+
+export async function addClientWalletBonus(request, response) {
+  const result = await creditWalletBonus({
+    ...request.validatedBody,
+    clientId: request.params.clientId,
+    createdBy: request.user._id,
+    source: "manual",
+  });
+  response.status(result.credited ? 201 : 200).json({
+    data: result,
+    message: result.credited
+      ? "The wallet bonus was credited successfully."
+      : "This wallet bonus was already credited.",
     success: true,
   });
 }

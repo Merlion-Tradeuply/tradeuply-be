@@ -38,6 +38,12 @@ function transactionRoute(transaction) {
   if (transaction.type === "withdrawal") {
     return { destination: "External crypto wallet", source: currencyWallet };
   }
+  if (transaction.type === "bonus") {
+    return {
+      destination: currencyWallet,
+      source: transaction.bonusSource === "signup" ? "Signup bonus" : "Admin wallet bonus",
+    };
+  }
   return transaction.direction === "credit"
     ? { destination: currencyWallet, source: "Account adjustment" }
     : { destination: "Account adjustment", source: currencyWallet };
