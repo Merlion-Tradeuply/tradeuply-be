@@ -51,6 +51,11 @@ function serializeDeposit(deposit, activities = []) {
     methodName: deposit.methodName,
     network: deposit.network,
     paymentCategory: deposit.paymentCategory ?? "crypto",
+    paymentExchangeRate: deposit.paymentExchangeRate?.toString() ?? null,
+    paymentQuoteExpiresAt: deposit.paymentQuoteExpiresAt,
+    paymentRateQuotedAt: deposit.paymentRateQuotedAt,
+    paymentRateSource: deposit.paymentRateSource ?? null,
+    requestedAmountUsd: deposit.requestedAmountUsd?.toString() ?? null,
     exchangeRate: deposit.exchangeRate?.toString() ?? null,
     quoteExpiresAt: deposit.quoteExpiresAt,
     rateQuotedAt: deposit.rateQuotedAt,
@@ -74,6 +79,19 @@ function requestContext(request) {
 export async function submitDeposit(client, payload, request) {
   const method = await getActivePaymentMethod(payload.paymentMethodId);
   const asset = method.asset.trim().toUpperCase();
+  const paymentQuote = await convertCurrency("USD", asset, payload.amountUsd);
+  const expectedAmount = paymentQuote.convertedAmount;
+  const allowedVariance = Math.max(
+    asset === "INR" ? 0.01 : 0.00000001,
+    expectedAmount * 0.01,
+  );
+
+  if (Math.abs(payload.amount - expectedAmount) > allowedVariance) {
+    throw new AppError("The payment amount no longer matches the live USD quote. Refresh the quote and try again.", {
+      code: "DEPOSIT_QUOTE_CHANGED",
+      statusCode: 422,
+    });
+  }
 
   if (method.minimumAmount !== null && payload.amount < method.minimumAmount) {
     throw new AppError(`The minimum deposit is ${method.minimumAmount} ${asset}.`, {
@@ -103,7 +121,12 @@ export async function submitDeposit(client, payload, request) {
       methodName: method.name,
       network: method.network,
       paymentCategory: method.category,
+      paymentExchangeRate: String(paymentQuote.rate),
       paymentMethod: method._id,
+      paymentQuoteExpiresAt: new Date(paymentQuote.quoteExpiresAt),
+      paymentRateQuotedAt: new Date(paymentQuote.lastUpdated),
+      paymentRateSource: paymentQuote.source,
+      requestedAmountUsd: payload.amountUsd.toFixed(2),
       senderWalletAddress: payload.senderWalletAddress,
       transactionHash: payload.transactionHash,
     });
@@ -114,6 +137,11 @@ export async function submitDeposit(client, payload, request) {
       actorType: "client",
       deposit: deposit._id,
       event: "submitted",
+      metadata: {
+        paymentAmount: String(payload.amount),
+        paymentAsset: asset,
+        requestedAmountUsd: payload.amountUsd.toFixed(2),
+      },
       newStatus: "pending",
       ...requestContext(request),
     });
@@ -187,7 +215,8 @@ async function getAdminDepositSearchFilter(query) {
   ];
 
   if (/^\d+(\.\d+)?$/.test(query)) {
-    options.push({ amount: mongoose.Types.Decimal128.fromString(query) });
+    const numeric = mongoose.Types.Decimal128.fromString(query);
+    options.push({ amount: numeric }, { requestedAmountUsd: numeric });
   }
 
   return { $or: options };

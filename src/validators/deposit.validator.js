@@ -13,6 +13,7 @@ export const adminDepositQuerySchema = z
 
 export const createDepositSchema = z.object({
   amount: z.number().finite().positive().max(100000000),
+  amountUsd: z.number().finite().min(0.01).max(100000000),
   notes: z.string().trim().max(1000).optional().default(""),
   paymentMethodId: z.string().trim().regex(/^[a-f\d]{24}$/i, "Invalid payment method."),
   senderWalletAddress: z.string().trim().min(3).max(200),
